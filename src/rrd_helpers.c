@@ -20,8 +20,8 @@
  *
  */
 
-#include "tesla.h"
 #include "rrd_helpers.h"
+#include "tesla.h"
 
 void
 RRD_update (char *rrd, unsigned int value, long process_time)
@@ -30,7 +30,7 @@ RRD_update (char *rrd, unsigned int value, long process_time)
   int argc = 3;
   char val[20];
 
-  sprintf (val, "%d:%d", process_time, value);
+  sprintf (val, "%ld:%u", process_time, value);
 
   argv[0] = "dummy";
   argv[1] = rrd;
@@ -66,7 +66,7 @@ RRD_create (char *rrd, unsigned int step)
   argv[argc++] = s;
   argv[argc++] = "--start";
   // Start a month ago, because that's the history that may be stored in the device.
-  sprintf (start, "%u", tv.tv_sec-2629743);
+  sprintf (start, "%lu", (unsigned long) tv.tv_sec-2629743);
   argv[argc++] = start;
   sprintf (energy,"DS:energy:GAUGE:60:0:U");
   argv[argc++] = energy;

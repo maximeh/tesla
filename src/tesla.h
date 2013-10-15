@@ -48,16 +48,12 @@
 #define FRAME_ID_LIVE 0x51
 #define FRAME_ID_DB   0x59 // value used to store in the DB (ch1_kw_avg)
 
+#define DBPATH "/var/lib/tesla.rrd"
+
 #define log(format, ...) if (verbose == 1) fprintf (stderr, format, ## __VA_ARGS__)
 
-static char ID_MSG[11] = {
-        0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56, 0x30, 0x30, 0x31, 0x01 };
-static char WAIT_MSG[11] = {
-        0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49, 0x54, 0x50, 0x43, 0x52 };
-
 extern int verbose;
-static char database_path[PATH_MAX] = "/var/lib/tesla.rrd";
-static char graph_path[PATH_MAX];
+extern char graph_path[PATH_MAX];
 
 struct cm160_device {
   struct usb_device *usb_dev;
@@ -74,12 +70,3 @@ struct record_data {
   // double ah; // watt hour and ampere hour are the units used inside the db
   // double wh;
 };
-
-void sigint_handler (int sig);
-static void dump_data (struct record_data *rec);
-static void decode (unsigned char *frame, struct record_data *rec);
-static int prepare_device (void);
-static int scan_usb (void);
-static int process (unsigned char *frame);
-static void get_data (void);
-static inline void usage ();

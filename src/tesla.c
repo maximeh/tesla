@@ -25,7 +25,24 @@
 #include "rrd_helpers.h"
 
 struct cm160_device owl_dev;
+static struct record_data rec;
+
 int verbose = 0;
+char graph_path[PATH_MAX];
+
+static char ID_MSG[11] = {
+        0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56, 0x30, 0x30, 0x31, 0x01 };
+static char WAIT_MSG[11] = {
+        0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49, 0x54, 0x50, 0x43, 0x52 };
+
+void sigint_handler (int sig);
+static void dump_data (struct record_data *rec);
+static void decode (unsigned char *frame, struct record_data *rec);
+static int prepare_device (void);
+static int scan_usb (void);
+static int process (unsigned char *frame);
+static void get_data (void);
+static inline void usage ();
 
 void
 sigint_handler (int sig)
@@ -41,12 +58,12 @@ sigint_handler (int sig)
 static void
 dump_data (struct record_data *rec)
 {
-  log ("Writing to %s\n", database_path);
+  log ("Writing to %s\n", DBPATH);
   time_t epoch;
   epoch = mktime (&(rec->date));
   //Convert to UTC
   epoch = mktime ( gmtime (&epoch));
-  RRD_update (database_path, (unsigned int)rec->watts, (long)epoch);
+  RRD_update (DBPATH, (unsigned int)rec->watts, (long)epoch);
 }
 
 static void
@@ -140,7 +157,6 @@ process (unsigned char *frame)
     return -1;
   }
 
-  struct record_data rec;
   memset (&rec, 0, sizeof (struct record_data));
   decode (frame, &rec);
 
@@ -270,11 +286,11 @@ main (int argc, char **argv)
   realpath (argv[0], graph_path);
 
   // Check if the RRD database exists, if not, create it
-  // database_path
-  if (access (database_path, F_OK) == -1)
+  // DBPATH
+  if (access (DBPATH, F_OK) == -1)
   {
     log ("Creating db\n");
-    RRD_create (database_path, 60);
+    RRD_create (DBPATH, 60);
   }
 
   log ("Please plug your CM160 device...\n");
@@ -294,11 +310,11 @@ main (int argc, char **argv)
 		{
 			sleep_step = 0;
 			// Generate graphs per day/weeks/month
-			RRD_graph (database_path, "hour", graph_path);
-			RRD_graph (database_path, "day", graph_path);
-			RRD_graph (database_path, "week", graph_path);
-			RRD_graph (database_path, "month", graph_path);
-			RRD_graph (database_path, "year", graph_path);
+			RRD_graph (DBPATH, "hour", graph_path);
+			RRD_graph (DBPATH, "day", graph_path);
+			RRD_graph (DBPATH, "week", graph_path);
+			RRD_graph (DBPATH, "month", graph_path);
+			RRD_graph (DBPATH, "year", graph_path);
 		}
 	}
 
