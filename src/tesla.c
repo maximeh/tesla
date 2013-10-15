@@ -44,6 +44,8 @@ dump_data (struct record_data *rec)
   log ("Writing to %s\n", database_path);
   time_t epoch;
   epoch = mktime (&(rec->date));
+  //Convert to UTC
+  epoch = mktime ( gmtime (&epoch));
   RRD_update (database_path, (unsigned int)rec->watts, (long)epoch);
 }
 
