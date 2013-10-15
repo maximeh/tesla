@@ -83,4 +83,3 @@ static int scan_usb (void);
 static int process (unsigned char *frame);
 static void get_data (void);
 static inline void usage ();
-int main (int argc, char **argv);
