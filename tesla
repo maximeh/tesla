@@ -1,0 +1,90 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          tesla
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Should-Start:      autofs
+# Should-Stop:       autofs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Tesla Energy Daemon
+# Description:       Start the tesla daemon.
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+NAME=tesla
+DESC="Tesla Energy Daemon"
+DAEMON=/usr/local/bin/tesla
+DEFAULT_PATH=/var/www/tesla/
+PIDFILE=/var/run/tesla/tesla.pid
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+if [ -n "$TESLA_DEBUG" ]; then
+    set -x
+    TESLA_OPTS=-v
+fi
+
+tesla_start () {
+    log_daemon_msg "Starting $DESC" "$NAME"
+
+    PIDDIR=$(dirname "$PIDFILE")
+    if [ ! -d "$PIDDIR" ]; then
+        mkdir -m 0755 $PIDDIR
+    fi
+
+    if [ ! -d "$DEFAULT_PATH" ]; then
+        mkdir -p -m 0755 $DEFAULT_PATH
+    fi
+
+    start-stop-daemon --start --quiet --make-pidfile \
+    --pidfile $PIDFILE --background \
+    --exec $DAEMON -- "$DEFAULT_PATH"
+    log_end_msg $?
+}
+
+tesla_stop () {
+    if [ -z "$PIDFILE" ]; then
+        log_failure_msg "cannot stop daemon."
+        exit 1
+    fi
+
+    log_daemon_msg "Stopping $DESC" "$NAME"
+    start-stop-daemon --stop --quiet --oknodo --retry 5 --pidfile "$PIDFILE"
+    log_end_msg $?
+}
+
+case "$1" in
+  start)
+    tesla_start
+    ;;
+  stop)
+    tesla_stop
+    ;;
+  status)
+    status_of_proc -p $PIDFILE $DAEMON $NAME
+    ;;
+  restart|force-reload)
+    tesla_stop
+    tesla_start
+    ;;
+  force-start)
+    tesla_start
+    ;;
+  force-restart)
+    tesla_stop
+    tesla_start
+    ;;
+  force-reload)
+    tesla_stop
+    tesla_start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|force-reload}"
+    exit 2
+    ;;
+esac
