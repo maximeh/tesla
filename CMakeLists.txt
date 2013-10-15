@@ -15,12 +15,6 @@ add_executable(
   ${source_files}
 )
 
-if(CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_CXX_FLAGS "-O0")
-    set(CMAKE_CXX_FLAGS "-g")
-    set(CMAKE_EXE_LINKER_FLAGS "-s")
-endif()
-
 find_package(PkgConfig REQUIRED)
 
 pkg_search_module(LIBUSB REQUIRED libusb)

@@ -63,3 +63,11 @@ To install the systemd service file:
 
 That's it.
 As soon as you plug the device in your machine, it will read the data and start generating graphs every 10mn.
+
+# Debugging
+
+If you feel like debugging, it's easy with cmake, just compile a debug build and add -Wall if you want. Enjoy
+and send your patches in!
+
+    $ cd build/
+    $ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG=-Wall ..
