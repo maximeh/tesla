@@ -56,5 +56,10 @@ To install the init script, you only need to do:
     $ sudo update-rc.d tesla defaults
     $ sudo /etc/init.d/tesla start
 
+To install the systemd service file:
+    $ sudo cp tesla.service /etc/systemd/system
+    $ sudo systemctl enable tesla
+    $ sudo systemctl start tesla
+
 That's it.
 As soon as you plug the device in your machine, it will read the data and start generating graphs every 10mn.
