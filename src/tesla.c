@@ -62,7 +62,7 @@ dump_data (struct record_data *rec)
   time_t epoch;
   epoch = mktime (&(rec->date));
   //Convert to UTC
-  epoch = mktime ( gmtime (&epoch));
+  epoch = mktime (gmtime (&epoch));
   RRD_update (DBPATH, (unsigned int)rec->watts, (long)epoch);
 }
 
@@ -174,7 +174,6 @@ process (unsigned char *frame)
   dump_data (&rec);
   return 0;
 }
-
 
 static void
 get_data (void)
@@ -300,23 +299,23 @@ main (int argc, char **argv)
   if ( prepare_device () == 1)
     return 1;
 
-	int sleep_step = 0;
+  int sleep_step = 0;
   log ("Start acquiring data...\n");
   while (1)
-	{
-		sleep (60);
-		get_data ();
-		if (sleep_step++ >= 10)
-		{
-			sleep_step = 0;
-			// Generate graphs per day/weeks/month
-			RRD_graph (DBPATH, "hour", graph_path);
-			RRD_graph (DBPATH, "day", graph_path);
-			RRD_graph (DBPATH, "week", graph_path);
-			RRD_graph (DBPATH, "month", graph_path);
-			RRD_graph (DBPATH, "year", graph_path);
-		}
-	}
+  {
+    sleep (60);
+    get_data ();
+    if (sleep_step++ >= 10)
+    {
+      sleep_step = 0;
+      // Generate graphs per day/weeks/month
+      RRD_graph (DBPATH, "hour", graph_path);
+      RRD_graph (DBPATH, "day", graph_path);
+      RRD_graph (DBPATH, "week", graph_path);
+      RRD_graph (DBPATH, "month", graph_path);
+      RRD_graph (DBPATH, "year", graph_path);
+    }
+  }
 
   usb_release_interface (owl_dev.hdev, 0);
   usb_close (owl_dev.hdev);
