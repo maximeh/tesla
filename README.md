@@ -3,10 +3,14 @@
 ![Tesla](./img/tesla_edison_oatmeal.jpg "Tesla")
 [Source: The Oatmeal](http://theoatmeal.com/)
 
-This is a very little project to grab the data from on OWL-CM160 and generate RRD graph.
-The way the OWL device communicates and the reverse engineering of the USB frame came from [Philippe Cornet's Eagle-Owl](https://github.com/cornetp/eagle-owl) project.
-A lot of Eagle-Owl code has been removed/changed but all the meaning part are from the original project.
-I did this fork since my need are really simple, I only wanted to generate RRD graph, no need for sqlite nor javascript.
+This is a very little project to grab the data from on OWL-CM160 and generate
+RRD graph.  The way the OWL device communicates and the reverse engineering of
+the USB frame came from
+[Philippe Cornet's Eagle-Owl](https://github.com/cornetp/eagle-owl) project.
+
+A lot of Eagle-Owl code has been removed/changed but all the meaning part are
+from the original project.  I did this fork since my need are really simple, I
+only wanted to generate RRD graph, no need for sqlite nor javascript.
 
 The graph are generated per:
 
@@ -20,10 +24,14 @@ The graph are generated per:
 
 ![OWL-CM160](./img/owl_cm160.jpg "OWL-CM160")
 
-This little guy here will measure the current passing through a wire with an amperometric clamp.
-It is not the most precise method in the world, but it'll do the job for many of us that rent a place and can't change easily the circuit breaker.
+This little guy here will measure the current passing through a wire with an
+amperometric clamp.
+It is not the most precise method in the world, but it'll do the job for many
+of us that rent a place and can't change easily the circuit breaker.
 
-With this device, and a little software, you can track your electrical consumption which let you find out some habits of yours or if you have a device that sucks way more that it should (an old frigdge, a lamp, ...).
+With this device, and a little software, you can track your electrical
+consumption which let you find out some habits of yours or if you have a device
+that sucks way more that it should (an old frigdge, a lamp, ...).
 
 # Requirements
 
@@ -47,7 +55,9 @@ Pretty standard:
 
 # Start
 
-You need to change the default path in the init script (the tesla file at the root of this repo).
+You need to change the default path in the init script (the tesla file at the
+root of this repo).
+
 This path is were the graph will be generated.
 
 To install the init script, you only need to do:
@@ -57,17 +67,22 @@ To install the init script, you only need to do:
     $ sudo /etc/init.d/tesla start
 
 To install the systemd service file:
+
     $ sudo cp tesla.service /etc/systemd/system
     $ sudo systemctl enable tesla
     $ sudo systemctl start tesla
 
 That's it.
-As soon as you plug the device in your machine, it will read the data and start generating graphs every 10mn.
+
+As soon as you plug the device in your machine, it will read the data and start
+generating graphs every 10mn.
 
 # Debugging
 
-If you feel like debugging, it's easy with cmake, just compile a debug build and add -Wall if you want. Enjoy
-and send your patches in!
+If you feel like debugging, it's easy with cmake, just compile a debug build
+and add -Wall if you want.
+
+Enjoy and send your patches in!
 
     $ cd build/
     $ cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS_DEBUG=-Wall ..
