@@ -1,0 +1,9 @@
+[Unit]
+Description=Tesla Energy Daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tesla /srv/http/tesla
+
+[Install]
+WantedBy=multi-user.target
