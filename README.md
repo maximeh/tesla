@@ -35,7 +35,7 @@ This should do the trick for a Debian/Ubuntu distribution:
 
 On Arch Linux:
 
-    $ sudo pacman -S cmake rrdtool libusb-compat
+    $ sudo pacman -S rrdtool libusb-compat cmake
 
 # Install
 
