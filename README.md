@@ -33,6 +33,10 @@ This should do the trick for a Debian/Ubuntu distribution:
 
     $ sudo apt-get install librrd4 libusb-dev cmake
 
+On Arch Linux:
+
+    $ sudo pacman -S cmake rrdtool libusb-compat
+
 # Install
 
 Pretty standard:
