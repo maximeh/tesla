@@ -1,6 +1,7 @@
 # Tesla
 
 ![Tesla](./img/tesla_edison_oatmeal.jpg "Tesla")
+[Source: The Oatmeal](http://theoatmeal.com/)
 
 This is a very little project to grab the data from on OWL-CM160 and generate RRD graph.
 The way the OWL device communicates and the reverse engineering of the USB frame came from [Philippe Cornet's Eagle-Owl](https://github.com/cornetp/eagle-owl) project.
