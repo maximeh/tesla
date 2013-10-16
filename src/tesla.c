@@ -27,7 +27,7 @@
 struct cm160_device owl_dev;
 static struct record_data rec;
 
-int verbose = 0;
+int do_verbose = 0;
 char graph_path[PATH_MAX];
 
 static char ID_MSG[11] = {
@@ -44,6 +44,24 @@ static int process (unsigned char *frame);
 static void get_data (void);
 static inline void usage ();
 
+inline void verbose (const char* format, ...)
+{
+  if (do_verbose == 0 ) return;
+  va_list args;
+  va_start(args, format);
+  fprintf(stdout, format, args);
+  va_end(args);
+}
+
+inline void debug (const char* format, ...)
+{
+  if (do_verbose <= 2) return;
+  va_list args;
+  va_start(args, format);
+  fprintf(stderr, format, args);
+  va_end(args);
+}
+
 void
 sigint_handler (int sig)
 {
@@ -58,7 +76,7 @@ sigint_handler (int sig)
 static void
 dump_data (struct record_data *rec)
 {
-  log ("Writing to %s\n", DBPATH);
+  debug ("Writing to %s\n", DBPATH);
   time_t epoch;
   epoch = mktime (&(rec->date));
   //Convert to UTC
@@ -116,14 +134,14 @@ process (unsigned char *frame)
 
   if(strncmp((char *)frame, ID_MSG, 11) == 0)
   {
-    log ("received ID MSG\n");
+    debug ("received ID MSG\n");
     data[0]=0x5A;
     usb_bulk_write (owl_dev.hdev, owl_dev.epout, (const char *)&data, sizeof (data), 1000);
     return 0;
   }
   else if(strncmp ((char *)frame, WAIT_MSG, 11) == 0)
   {
-    log ("received WAIT MSG\n");
+    debug ("received WAIT MSG\n");
     data[0]=0xA5;
     usb_bulk_write (owl_dev.hdev, owl_dev.epout, (const char *)&data, sizeof (data), 1000);
     return 0;
@@ -137,10 +155,10 @@ process (unsigned char *frame)
 
   if(frame[0] != FRAME_ID_DB)
   {
-    log ("data error: invalid ID 0x%x\n", frame[0]);
+    debug ("data error: invalid ID 0x%x\n", frame[0]);
     for (i=0; i<11; i++)
-      log ("0x%02x - ", frame[i]);
-    log ("\n");
+      debug ("0x%02x - ", frame[i]);
+    debug ("\n");
     return -1;
   }
 
@@ -152,7 +170,7 @@ process (unsigned char *frame)
   // Checksum should be egal the 10nth element of the frame
   if (checksum != frame[10])
   {
-    log ("data error: invalid checksum: expected 0x%x, got 0x%x\n",
+    debug ("data error: invalid checksum: expected 0x%x, got 0x%x\n",
         frame[10], checksum);
     return -1;
   }
@@ -170,7 +188,7 @@ process (unsigned char *frame)
 
   char buf[18];
   strftime (buf, sizeof (buf), "%Y/%m/%d %H:%M", &(rec.date));
-  log ("VALUE: %s : %f W\n", buf, rec.watts);
+  debug ("DATA: %s : %f W\n", buf, rec.watts);
   dump_data (&rec);
   return 0;
 }
@@ -185,15 +203,15 @@ get_data (void)
   ret = usb_bulk_read (owl_dev.hdev, owl_dev.epin, (char*)buffer, sizeof(buffer), 10000);
   if( ret < 0 )
   {
-    fprintf (stderr, "bulk_read returned %d (%s)\n", ret, usb_strerror ());
+    debug ("bulk_read returned %d (%s)\n", ret, usb_strerror ());
     return;
   }
-  log ("read %d bytes: \n", ret);
+  debug ("read %d bytes: \n", ret);
 
   unsigned char *bufptr = (unsigned char *)buffer;
   int nb_words = ret/11; // incomplete words are resent
 
-  log ("nb words: %d\n", nb_words);
+  debug ("nb words: %d\n", nb_words);
   while (nb_words--)
   {
     process (bufptr);
@@ -260,13 +278,17 @@ main (int argc, char **argv)
   signal (SIGINT, sigint_handler);
 
   int c;
-  while ((c = getopt (argc, argv, "hf:vm")) != -1)
+  while ((c = getopt (argc, argv, "hf:vdm")) != -1)
   {
     switch (c)
     {
       case 'v':
         /* verbose mode */
-        verbose = 1;
+        do_verbose = 1;
+        break;
+      case 'd':
+        /* debug mode */
+        do_verbose = 2;
         break;
       case 'h':
       default:
@@ -288,11 +310,11 @@ main (int argc, char **argv)
   // DBPATH
   if (access (DBPATH, F_OK) == -1)
   {
-    log ("Creating db\n");
+    verbose ("Creating db\n");
     RRD_create (DBPATH, 60);
   }
 
-  log ("Please plug your CM160 device...\n");
+  verbose ("Please plug your CM160 device...\n");
   while (scan_usb () == 0)
     sleep (5);
 
@@ -300,7 +322,7 @@ main (int argc, char **argv)
     return 1;
 
   int sleep_step = 0;
-  log ("Start acquiring data...\n");
+  verbose ("Start acquiring data...\n");
   while (1)
   {
     sleep (60);
@@ -329,9 +351,10 @@ main (int argc, char **argv)
 static void
 usage (void)
 {
-  (void) fprintf (stderr, "tesla [-h] [-v] PATH\n");
+  (void) fprintf (stderr, "tesla [-h] [-d] [-v] PATH\n");
   fputs(
       "\t-h\t\tThis usage statement\n"
       "\t-v\t\tVerbose output\n"
+      "\t-d\t\tDebug output\n"
       , stderr);
 }

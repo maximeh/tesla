@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -50,10 +51,10 @@
 
 #define DBPATH "/var/lib/tesla.rrd"
 
-#define log(format, ...) if (verbose == 1) fprintf (stderr, format, ## __VA_ARGS__)
-
-extern int verbose;
+extern int do_verbose;
 extern char graph_path[PATH_MAX];
+inline void verbose (const char* format, ...);
+inline void debug (const char* format, ...);
 
 struct cm160_device {
   struct usb_device *usb_dev;

@@ -41,10 +41,10 @@ RRD_update (char *rrd, unsigned int value, long process_time)
   rrd_update (argc, argv);
   if(rrd_test_error ())
   {
-    log ("RRD_update (%s): %s\n", rrd, rrd_get_error ());
+    verbose ("RRD_update (%s): %s\n", rrd, rrd_get_error ());
     return;
   }
-  log ("Updated rrd %s with value %s\n", rrd, val);
+  verbose ("Updated rrd %s with value %s\n", rrd, val);
   return;
 }
 
@@ -87,10 +87,10 @@ RRD_create (char *rrd, unsigned int step)
   rrd_create (argc, argv);
   if (rrd_test_error ())
   {
-    log ("RRD_create: %s\n", rrd_get_error ());
+    verbose ("RRD_create: %s\n", rrd_get_error ());
     return;
   }
-  log ("Created rrd %s\n", rrd);
+  verbose ("Created rrd %s\n", rrd);
   return;
 }
 
@@ -167,10 +167,10 @@ RRD_graph (char *rrd, char *period, char *graph_path)
   rrd_graph_v (argc, argv);
   if (rrd_test_error ())
   {
-    log ("RRD_graph: %s\n", rrd_get_error ());
+    verbose ("RRD_graph: %s\n", rrd_get_error ());
     return;
   }
-  log ("Created graph rrd %s\n", path);
+  verbose ("Created graph rrd %s\n", path);
   return;
 }
 
