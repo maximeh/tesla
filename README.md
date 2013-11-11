@@ -39,7 +39,7 @@ You should have librrd4, libusb and cmake installed on your system.
 
 This should do the trick for a Debian/Ubuntu distribution:
 
-    $ sudo apt-get install librrd4 libusb-dev cmake
+    $ sudo apt-get install librrd-dev libusb-dev cmake
 
 On Arch Linux:
 
