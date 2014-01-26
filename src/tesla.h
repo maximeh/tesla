@@ -53,8 +53,8 @@
 
 extern int do_verbose;
 extern char graph_path[PATH_MAX];
-inline void verbose (const char* format, ...);
-inline void debug (const char* format, ...);
+inline int verbose (const char* format, ...);
+inline int debug (const char* format, ...);
 
 struct cm160_device {
   struct usb_device *usb_dev;

@@ -44,22 +44,24 @@ static int process (unsigned char *frame);
 static void get_data (void);
 static inline void usage ();
 
-inline void verbose (const char* format, ...)
+inline int verbose (const char* format, ...)
 {
-  if (do_verbose == 0 ) return;
+  if (do_verbose == 0 ) return 0;
   va_list args;
   va_start(args, format);
-  fprintf(stdout, format, args);
+  int ret = vfprintf(stdout, format, args);
   va_end(args);
+  return ret;
 }
 
-inline void debug (const char* format, ...)
+inline int debug (const char* format, ...)
 {
-  if (do_verbose <= 2) return;
+  if (do_verbose < 2) return 0;
   va_list args;
   va_start(args, format);
-  fprintf(stderr, format, args);
+  int ret = vfprintf(stderr, format, args);
   va_end(args);
+  return ret;
 }
 
 void
