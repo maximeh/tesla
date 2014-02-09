@@ -74,13 +74,14 @@ RRD_create (char *rrd, unsigned int step)
   // http://eccentric.cx/misc/rrdcalc.html
   // Hourly, keep 1 data every step (60s), keep 60 of them, 60*60 = 1h
   argv[argc++] = "RRA:AVERAGE:0.5:1:60";
-  // Daily, keep 1 cons. data every step (60s), keep 1440 of them, 60*1440 = 24h
-  argv[argc++] = "RRA:AVERAGE:0.5:1:1440";
-  // Weekly, every 5 data, keep one. Keep 2016 of them, 2016*5*60 = 1 week
-  // It can also be viewed as keep 2016 rows of data, with a resolution of 5 minutes. (2016*5*step = 1W)
-  argv[argc++] = "RRA:AVERAGE:0.5:5:2016";
-  // Monthly, every 10 data (minutes), keep one. Keep 4380 of them, 4380*10*60 = 1 month
-  argv[argc++] = "RRA:AVERAGE:0.5:10:4380";
+  // Daily, keep 1 cons. data every 30 step, keep 48 of them, 60*30*48 = 24h
+  argv[argc++] = "RRA:AVERAGE:0.5:30:48";
+  // Weekly, every 720 data, keep one, keep 14 of them. 720*60*14 = 1 week
+  argv[argc++] = "RRA:AVERAGE:0.5:720:14";
+  // Monthly, every 1440 data, keep one. Keep 30 of them, 1440*60*30 = 1 month
+  argv[argc++] = "RRA:AVERAGE:0.5:1440:30";
+  // Yearly, every 10080 minutes (a week), keep one. Keep 52 of them..
+  argv[argc++] = "RRA:AVERAGE:0.5:10080:52";
 
   optind=0; opterr=0;
   rrd_clear_error ();
