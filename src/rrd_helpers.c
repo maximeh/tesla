@@ -70,6 +70,8 @@ RRD_create (char *rrd, unsigned int step)
   argv[argc++] = start;
   sprintf (energy,"DS:energy:GAUGE:60:0:U");
   argv[argc++] = energy;
+	// Keep the last value
+  argv[argc++] = "RRA:LAST:0.5:1:1";
 
   // http://eccentric.cx/misc/rrdcalc.html
   // Hourly, keep 1 data every step (60s), keep 60 of them, 60*60 = 1h
@@ -92,86 +94,6 @@ RRD_create (char *rrd, unsigned int step)
     return;
   }
   verbose ("Created rrd %s\n", rrd);
-  return;
-}
-
-void
-RRD_graph (char *rrd, char *period, char *graph_path)
-{
-  char *argv[80];
-  int argc=0;
-  char start[20];
-  char path[PATH_MAX];
-  char title[32];
-  char energy[20+PATH_MAX];
-
-  argv[argc++] = "graph";
-  sprintf (path, "%s/energy-%s.png", graph_path, period);
-  argv[argc++] = path;
-  argv[argc++] = "--start";
-  sprintf (start, "-1%s", period);
-  argv[argc++] = start;
-  argv[argc++] = "-t";
-  sprintf (title, "Energy usage of the last %s", period);
-  argv[argc++] = title;
-  argv[argc++] = "-z";
-  argv[argc++] = "-c";
-  argv[argc++] = "BACK#FFFFFF";
-  argv[argc++] = "-c";
-  argv[argc++] = "SHADEA#FFFFFF";
-  argv[argc++] = "-c";
-  argv[argc++] = "SHADEB#FFFFFF";
-  argv[argc++] = "-c";
-  argv[argc++] = "MGRID#AAAAAA";
-  argv[argc++] = "-c";
-  argv[argc++] = "GRID#CCCCCC";
-  argv[argc++] = "-c";
-  argv[argc++] = "ARROW#333333";
-  argv[argc++] = "-c";
-  argv[argc++] = "FONT#333333";
-  argv[argc++] = "-c";
-  argv[argc++] = "AXIS#333333";
-  argv[argc++] = "-c";
-  argv[argc++] = "FRAME#333333";
-  argv[argc++] = "-h";
-  argv[argc++] = "480";
-  argv[argc++] = "-w";
-  argv[argc++] = "1024";
-  argv[argc++] = "-l";
-  argv[argc++] = "0";
-  argv[argc++] = "-a";
-  argv[argc++] = "PNG";
-  argv[argc++] = "-v";
-  argv[argc++] = "W";
-  sprintf (energy, "DEF:energy=%s:energy:AVERAGE", rrd);
-  argv[argc++] = energy;
-  argv[argc++] = "VDEF:min=energy,MINIMUM";
-  argv[argc++] = "VDEF:max=energy,MAXIMUM";
-  argv[argc++] = "VDEF:avg=energy,AVERAGE";
-  argv[argc++] = "VDEF:lst=energy,LAST";
-  argv[argc++] = "COMMENT: \\l";
-  argv[argc++] = "COMMENT:               ";
-  argv[argc++] = "COMMENT:Minimum    ";
-  argv[argc++] = "COMMENT:Maximum    ";
-  argv[argc++] = "COMMENT:Average    ";
-  argv[argc++] = "COMMENT:Current    \\l";
-  argv[argc++] = "COMMENT:   ";
-  argv[argc++] = "AREA:energy#EDA362:Usage  ";
-  argv[argc++] = "LINE1:energy#F47200";
-  argv[argc++] = "GPRINT:min:%5.1lf %sW   ";
-  argv[argc++] = "GPRINT:max:%5.1lf %sW   ";
-  argv[argc++] = "GPRINT:avg:%5.1lf %sW   ";
-  argv[argc++] = "GPRINT:lst:%5.1lf %sW   \\l";
-
-  optind=0; opterr=0;
-  rrd_clear_error ();
-  rrd_graph_v (argc, argv);
-  if (rrd_test_error ())
-  {
-    verbose ("RRD_graph: %s\n", rrd_get_error ());
-    return;
-  }
-  verbose ("Created graph rrd %s\n", path);
   return;
 }
 

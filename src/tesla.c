@@ -28,7 +28,7 @@ struct cm160_device owl_dev;
 static struct record_data rec;
 
 int do_verbose = 0;
-char graph_path[PATH_MAX];
+char DBPATH[PATH_MAX] = "/var/lib/tesla.rrd";
 
 static char ID_MSG[11] = {
         0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56, 0x30, 0x30, 0x31, 0x01 };
@@ -270,13 +270,6 @@ int
 main (int argc, char **argv)
 {
 
-  // Check that we are the root user
-  if (geteuid () != 0)
-  {
-    fprintf (stderr, "You are not root...\n");
-    return 1;
-  }
-
   signal (SIGINT, sigint_handler);
 
   int c;
@@ -301,18 +294,19 @@ main (int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  if (argc != 1)
+  // Check that we are the root user
+  if (geteuid () != 0)
   {
-    usage ();
-    return 0;
+    fprintf (stderr, "You are not root...\n");
+    return 1;
   }
-  realpath (argv[0], graph_path);
 
-  // Check if the RRD database exists, if not, create it
-  // DBPATH
+  if (argc == 1)
+		realpath (argv[0], DBPATH);
+
   if (access (DBPATH, F_OK) == -1)
   {
-    verbose ("Creating db\n");
+    verbose ("Creating db: %s\n", DBPATH);
     RRD_create (DBPATH, 60);
   }
 
@@ -323,22 +317,11 @@ main (int argc, char **argv)
   if ( prepare_device () == 1)
     return 1;
 
-  int sleep_step = 0;
   verbose ("Start acquiring data...\n");
   while (1)
   {
     sleep (60);
     get_data ();
-    if (sleep_step++ >= 10)
-    {
-      sleep_step = 0;
-      // Generate graphs per day/weeks/month
-      RRD_graph (DBPATH, "hour", graph_path);
-      RRD_graph (DBPATH, "day", graph_path);
-      RRD_graph (DBPATH, "week", graph_path);
-      RRD_graph (DBPATH, "month", graph_path);
-      RRD_graph (DBPATH, "year", graph_path);
-    }
   }
 
   usb_release_interface (owl_dev.hdev, 0);
@@ -353,7 +336,7 @@ main (int argc, char **argv)
 static void
 usage (void)
 {
-  (void) fprintf (stderr, "tesla [-h] [-d] [-v] PATH\n");
+  (void) fprintf (stderr, "tesla [-h] [-d] [-v] <RRD DATABASE PATH>\n");
   fputs(
       "\t-h\t\tThis usage statement\n"
       "\t-v\t\tVerbose output\n"

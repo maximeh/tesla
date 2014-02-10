@@ -27,4 +27,3 @@
 
 void RRD_create (char *rrd, unsigned int step);
 void RRD_update (char *rrd, unsigned int value, long process_time);
-void RRD_graph (char *rrd, char *period, char *graph_path);

@@ -12,13 +12,18 @@ A lot of Eagle-Owl code has been removed/changed but all the meaning part are
 from the original project.  I did this fork since my need are really simple, I
 only wanted to generate RRD graph, no need for sqlite nor javascript.
 
-The graph are generated per:
+The RRD database currently hold:
 
-- Hours
-- Day
-- Week
-- Months
-- Year
+- 60 entry points per hour
+- 48 entry points per day (One per half hour)
+- 14 per week (Two per day, averaged with 720 entries each; representing 12h)
+- 30 per month (One for each day, averaged with 1440 entries; representing 24h)
+- 52 per year (One per week, averaged with 10080 entries; representing 1 week)
+- The last value
+
+In order to graph, you can uses scripts in the tools directory which call
+rrdtool to generate the graph. You can obviously uses any tools you want to
+graph this results, rrd can also exports as XML or JSON.
 
 # OWL-CM160
 
@@ -74,8 +79,8 @@ To install the systemd service file:
 
 That's it.
 
-As soon as you plug the device in your machine, it will read the data and start
-generating graphs every 10mn.
+As soon as you plug the device in your machine, it will read the data and
+populate its RRD database.
 
 # Debugging
 

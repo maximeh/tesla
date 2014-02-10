@@ -18,7 +18,7 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 NAME=tesla
 DESC="Tesla Energy Daemon"
 DAEMON=/usr/local/bin/tesla
-DEFAULT_PATH=/var/www/tesla/
+DEFAULT_PATH=/var/lib/tesla.rrd
 PIDFILE=/var/run/tesla/tesla.pid
 
 # Exit if the package is not installed
@@ -35,10 +35,6 @@ tesla_start () {
     PIDDIR=$(dirname "$PIDFILE")
     if [ ! -d "$PIDDIR" ]; then
         mkdir -m 0755 $PIDDIR
-    fi
-
-    if [ ! -d "$DEFAULT_PATH" ]; then
-        mkdir -p -m 0755 $DEFAULT_PATH
     fi
 
     start-stop-daemon --start --quiet --make-pidfile \

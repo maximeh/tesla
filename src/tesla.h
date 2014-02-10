@@ -49,10 +49,7 @@
 #define FRAME_ID_LIVE 0x51
 #define FRAME_ID_DB   0x59 // value used to store in the DB (ch1_kw_avg)
 
-#define DBPATH "/var/lib/tesla.rrd"
-
 extern int do_verbose;
-extern char graph_path[PATH_MAX];
 inline int verbose (const char* format, ...);
 inline int debug (const char* format, ...);
 

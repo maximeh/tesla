@@ -3,7 +3,7 @@ Description=Tesla Energy Daemon
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/tesla /srv/http/tesla
+ExecStart=/usr/local/bin/tesla /var/lib/tesla.rrd
 
 [Install]
 WantedBy=multi-user.target
