@@ -70,6 +70,7 @@ sigint_handler (int sig)
   if (!owl_dev.hdev)
     return;
 
+  debug ("Closing connection with the device\n");
   usb_release_interface (owl_dev.hdev, 0);
   usb_close (owl_dev.hdev);
   exit (0);
@@ -134,6 +135,11 @@ process (unsigned char *frame)
   unsigned int checksum = 0;
   static int last_valid_month = 0;
 
+	for(i=0; i<79; i++) debug("-");
+	debug("-\n");
+  for (i=0; i<10; i++) debug ("0x%02x - ", frame[i]);
+  debug ("0x%02x\n", frame[11]);
+
   if(strncmp((char *)frame, ID_MSG, 11) == 0)
   {
     debug ("received ID MSG\n");
@@ -158,9 +164,8 @@ process (unsigned char *frame)
   if(frame[0] != FRAME_ID_DB)
   {
     debug ("data error: invalid ID 0x%x\n", frame[0]);
-    for (i=0; i<11; i++)
-      debug ("0x%02x - ", frame[i]);
-    debug ("\n");
+    for (i=0; i<10; i++) debug ("0x%02x - ", frame[i]);
+    debug ("0x%02x\n", frame[11]);
     return -1;
   }
 
