@@ -1,3 +1,3 @@
 #!/bin/sh
 
-rrdtool dump "$1" | perl -ne 'BEGIN {$t=`date +%s`; chomp($t);} $a=$_; if ($a =~ /lastupdate.\d+..lastupdate/) { $a =~ s/(lastupdate.)\d+(..lastupdate)/$1$t$2/; } print $a' | rrdtool restore -f - "$1"
+rrdtool dump "$1" | sed -e "s/<lastupdate>1[0-9]\{9\}/<lastupdate>$2/" | rrdtool restore -f - "$1"
