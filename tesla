@@ -19,6 +19,9 @@ NAME=tesla
 DESC="Tesla Energy Daemon"
 DAEMON=/usr/local/bin/tesla
 DEFAULT_PATH=/var/lib/tesla.rrd
+KEENIO_PROJECT_ID=
+KEENIO_API_KEY=
+TESLA_OPTS=
 PIDFILE=/var/run/tesla/tesla.pid
 
 # Exit if the package is not installed
@@ -26,7 +29,15 @@ PIDFILE=/var/run/tesla/tesla.pid
 
 if [ -n "$TESLA_DEBUG" ]; then
     set -x
-    TESLA_OPTS=-v
+    TESLA_OPTS="${TESLA_OPTS} -v"
+fi
+
+if [ -z "${KEENIO_API_KEY}" ]; then
+    TESLA_OPTS="${TESLA_OPTS} ${DEFAULT_PATH}"
+elif [ ! -z "${KEENIO_PROJECT_ID}" ]; then
+    TESLA_OPTS="${TESLA_OPTS} ${KEENIO_API_KEY} ${KEENIO_PROJECT_ID}"
+    # Empty the RRD path, since we want to use keen.io
+    DEFAULT_PATH=
 fi
 
 tesla_start () {
@@ -39,7 +50,7 @@ tesla_start () {
 
     start-stop-daemon --start --quiet --make-pidfile \
     --pidfile $PIDFILE --background \
-    --exec $DAEMON -- "$DEFAULT_PATH"
+    --exec /bin/bash -- -c "$DAEMON ${TESLA_OPTS}"
     log_end_msg $?
 }
 

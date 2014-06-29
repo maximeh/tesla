@@ -24,16 +24,16 @@
 #pragma once
 
 #define _XOPEN_SOURCE 500
-#include <stdio.h>
-#include <string.h>
-#include <usb.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <time.h>
 #include <stdarg.h>
-#include <sys/types.h>
-#include <sys/time.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <usb.h>
 
 // DEV_ID and PID
 #define OWL_VENDOR_ID 0x0fde
@@ -46,12 +46,9 @@
 #define UART_DISABLE            0x0000
 
 // CM160 protocol
+#define HISTORY_SIZE 65536 // 30 * 24 * 60 = 43200 theoric history size
 #define FRAME_ID_LIVE 0x51
 #define FRAME_ID_DB   0x59 // value used to store in the DB (ch1_kw_avg)
-
-extern int do_verbose;
-inline int verbose (const char* format, ...);
-inline int debug (const char* format, ...);
 
 struct cm160_device {
   struct usb_device *usb_dev;
@@ -64,7 +61,13 @@ struct record_data {
   struct tm date;
   double watts;
   double amps;
-  // double cost;
-  // double ah; // watt hour and ampere hour are the units used inside the db
-  // double wh;
 };
+
+extern int do_verbose;
+#ifdef USE_KEEN
+extern char *keenio_key;
+extern char *keenio_project;
+#endif
+int verbose (const char* format, ...);
+int debug (const char* format, ...);
+

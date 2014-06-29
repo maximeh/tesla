@@ -38,16 +38,6 @@ GPRINT:min:"\t%5.1lf%sW" \
 GPRINT:max:"\t%5.1lf%sW" \
 GPRINT:avg:"\t%5.1lf%sW" \
 GPRINT:lst:"\t%5.1lf%sW\n" \
-LINE4:max#66281A::dashes \
-LINE2:max#B2462E:"Max":dashes \
-LINE4:min#2A616B::dashes \
-LINE2:min#48A5B8:"Min":dashes \
-LINE6:smooth_energy#1A1A40 \
-LINE4:smooth_energy#39398C \
-LINE2:smooth_energy#5353CC
-
-# Area graph
-#AREA:energy#EDA362:Usage  \
-#LINE1:energy#F47200
-
+AREA:energy#EDA362:Usage  \
+LINE1:energy#F47200
 

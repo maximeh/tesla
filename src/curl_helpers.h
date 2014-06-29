@@ -23,7 +23,14 @@
 #pragma once
 
 #include <time.h>
-#include <rrd.h>
+#include <curl/curl.h>
 
-int RRD_create (char *rrd, unsigned int step);
-int RRD_update (char *rrd, unsigned int value, long process_time);
+struct memoryStruct
+{
+	char *memory;
+	size_t size;
+};
+
+int curl_update (unsigned int step, struct tm *date);
+size_t write_memory_callback (void *ptr, size_t size, size_t nmemb, void *data);
+static void* curl_realloc(void *ptr, size_t size);
