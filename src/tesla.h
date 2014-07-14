@@ -64,9 +64,5 @@ struct record_data {
 };
 
 extern int do_verbose;
-#ifdef USE_KEEN
-extern char *keenio_key;
-extern char *keenio_project;
-#endif
 int verbose(const char *format, ...);
 int debug(const char *format, ...);

@@ -22,11 +22,7 @@
  */
 
 #include "tesla.h"
-#ifdef USE_RRD
 #include "rrd_helpers.h"
-#elif defined USE_KEEN
-#include "curl_helpers.h"
-#endif
 
 struct cm160_device owl_dev;
 static struct record_data rec;
@@ -37,12 +33,7 @@ int rec_id = 0;
 pthread_t thread;
 
 int do_verbose = 0;
-#ifdef USE_RRD
 char DBPATH[PATH_MAX] = "/var/lib/tesla.rrd";
-#elif defined USE_KEEN
-char *keenio_key = "";
-char *keenio_project = "";
-#endif
 
 static char ID_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56, 0x30,
         0x30, 0x31, 0x01
@@ -118,13 +109,7 @@ dump_data(struct record_data *rec)
                 fprintf(stderr, "ERROR: mktime detected an error.\n");
                 return -1;
         }
-#ifdef USE_RRD
         RRD_update(DBPATH, (unsigned int)rec->watts, (long)epoch);
-#elif defined USE_KEEN
-        if (strlen(keenio_key) && strlen(keenio_project))
-                curl_update((unsigned int)rec->watts, time_utc);
-#endif
-
         return 0;
 }
 
@@ -357,11 +342,7 @@ prepare_device(void)
 static void
 usage(void)
 {
-#ifdef USE_RRD
         (void)fprintf(stdout, "tesla [OPTIONS] [RRD DATABASE PATH]\n");
-#elif defined USE_KEEN
-        (void)fprintf(stdout, "tesla [OPTIONS] API_KEY PROJECT_ID\n");
-#endif
         fputs("\t-d\t\tDebug output\n"
               "\t-h\t\tThis usage statement\n"
               "\t-v\t\tVerbose output\n", stdout);
@@ -398,7 +379,6 @@ main(int argc, char **argv)
                 fprintf(stderr, "ERROR: You need to be root.\n");
                 return -1;
         }
-#ifdef USE_RRD
         if (argc == 1)
                 realpath(argv[0], DBPATH);
 
@@ -408,14 +388,6 @@ main(int argc, char **argv)
                         return -1;
         }
         debug("Using DB: %s\n", DBPATH);
-#elif defined USE_KEEN
-        if (argc == 2) {
-                keenio_key = argv[0];
-                keenio_project = argv[1];
-        }
-        debug("API Key: %s\n", keenio_key);
-        debug("Project ID: %s\n", keenio_project);
-#endif
 
         verbose("Please plug your CM160 device...\n");
         while (scan_usb())
