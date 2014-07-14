@@ -1,15 +1,15 @@
 #!/bin/sh
 
-DB_PATH="$1"
-GRAPH_PATH="$2"
-PERIOD="$3"
+PERIOD="$1"
+DB_PATH="$2"
+GRAPH_PATH="$3"
 
-echo "Usage: <DB_PATH> <GRAPH_PATH> <PERDIOD>"
+echo "Usage: <PERIOD> <DB_PATH> <GRAPH_PATH>"
 echo "Period available: hour, day, week, month, year"
 
-[ -z "$DB_PATH" ] && DB_PATH=/var/lib/tesla.rrd
-[ -z "$GRAPH_PATH" ] && GRAPH_PATH=$(pwd)/graph.png
 [ -z "$PERIOD" ] && PERIOD="hour"
+[ -z "$DB_PATH" ] && DB_PATH=/var/lib/tesla.rrd
+[ -z "$GRAPH_PATH" ] && GRAPH_PATH=$(pwd)/graph_${PERIOD}.png
 
 rrdtool graph ${GRAPH_PATH} --start -1${PERIOD} -t "Energy usage of the last ${PERIOD}" -z \
 -c BACK#FFFFFF \
