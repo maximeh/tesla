@@ -46,21 +46,21 @@
 #define UART_DISABLE            0x0000
 
 // CM160 protocol
-#define HISTORY_SIZE 65536 // 30 * 24 * 60 = 43200 theoric history size
+#define HISTORY_SIZE 65536      // 30 * 24 * 60 = 43200 theoric history size
 #define FRAME_ID_LIVE 0x51
-#define FRAME_ID_DB   0x59 // value used to store in the DB (ch1_kw_avg)
+#define FRAME_ID_DB   0x59      // value used to store in the DB (ch1_kw_avg)
 
 struct cm160_device {
-  struct usb_device *usb_dev;
-  usb_dev_handle *hdev;
-  int epin;  // IN end point address
-  int epout; // OUT end point address
+        struct usb_device *usb_dev;
+        usb_dev_handle *hdev;
+        int epin;               // IN end point address
+        int epout;              // OUT end point address
 };
 
 struct record_data {
-  struct tm date;
-  double watts;
-  double amps;
+        struct tm date;
+        double watts;
+        double amps;
 };
 
 extern int do_verbose;
@@ -68,6 +68,5 @@ extern int do_verbose;
 extern char *keenio_key;
 extern char *keenio_project;
 #endif
-int verbose (const char* format, ...);
-int debug (const char* format, ...);
-
+int verbose(const char *format, ...);
+int debug(const char *format, ...);

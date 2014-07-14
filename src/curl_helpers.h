@@ -25,12 +25,11 @@
 #include <time.h>
 #include <curl/curl.h>
 
-struct memoryStruct
-{
-	char *memory;
-	size_t size;
+struct memoryStruct {
+        char *memory;
+        size_t size;
 };
 
-int curl_update (unsigned int step, struct tm *date);
-size_t write_memory_callback (void *ptr, size_t size, size_t nmemb, void *data);
-static void* curl_realloc(void *ptr, size_t size);
+int curl_update(unsigned int step, struct tm *date);
+size_t write_memory_callback(void *ptr, size_t size, size_t nmemb, void *data);
+static void *curl_realloc(void *ptr, size_t size);
