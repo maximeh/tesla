@@ -25,12 +25,11 @@
 #include "rrd_helpers.h"
 
 struct cm160_device owl_dev;
-static struct record_data rec;
 
-struct record_data *history[HISTORY_SIZE];
+struct record_data *history[HISTORY_SIZE] = { 0 };
+
 int dumping_history = 1;
-int rec_id = 0;
-pthread_t thread;
+int rec_id = -1;
 
 int do_verbose = 0;
 char DBPATH[PATH_MAX] = "/var/lib/tesla.rrd";
@@ -92,23 +91,24 @@ sigint_handler(int sig)
 static int
 dump_data(struct record_data *rec)
 {
-#ifdef USE_RRD
-        debug("Writing to %s\n", DBPATH);
-#endif
         time_t epoch;
         struct tm *time_utc;
+
         epoch = mktime(&(rec->date));
         if (epoch == -1) {
                 fprintf(stderr, "ERROR: mktime detected an error.\n");
                 return -1;
         }
-        //Convert to UTC
+
+        /* Convert to UTC (That's what RRD eats, it will convert to local
+           timezone using tz env variable) */
         time_utc = gmtime(&epoch);
         epoch = mktime(time_utc);
         if (epoch == -1) {
                 fprintf(stderr, "ERROR: mktime detected an error.\n");
                 return -1;
         }
+
         RRD_update(DBPATH, (unsigned int)rec->watts, (long)epoch);
         return 0;
 }
@@ -161,6 +161,8 @@ process(unsigned char *frame)
         unsigned int checksum = 0;
         static int last_valid_month = 0;
 
+        struct record_data *rec = calloc(1, sizeof(struct record_data));
+
         for (i = 0; i < 79; i++)
                 debug("-");
         debug("-\n");
@@ -194,16 +196,15 @@ process(unsigned char *frame)
         if ((dumping_history && frame[0] == FRAME_ID_LIVE)
             || rec_id >= HISTORY_SIZE) {
                 dumping_history = 0;
-                for (i = 0; i < rec_id; i++) {
-                        verbose("Dump history... done. (%d/%d stored)\n", i,
-                                rec_id);
+                for (i = 0; i <= rec_id; ++i) {
+                        verbose("Dump history... done. (%d/%d stored)\n", i + 1,
+                                rec_id + 2);
                         if (dump_data(history[i])) {
                                 fprintf(stderr,
                                         "ERROR: Could not dump current data.\n");
                                 return -1;
                         }
-                        // If we send data too fast it can cause problem.
-                        sleep(2);
+                        free(history[i]);
                 }
                 return 0;
         }
@@ -230,30 +231,30 @@ process(unsigned char *frame)
                 return -1;
         }
 
-        memset(&rec, 0, sizeof(struct record_data));
-        decode(frame, &rec);
+        decode(frame, rec);
 
         // There seem to be an issues with the month, some time they wind up getting
         // crazy value.
         // Don't know why...
-        if (rec.date.tm_mon < 0 || rec.date.tm_mon > 11)
-                rec.date.tm_mon = last_valid_month;
+        if (rec->date.tm_mon < 0 || rec->date.tm_mon > 11)
+                rec->date.tm_mon = last_valid_month;
         else
-                last_valid_month = rec.date.tm_mon;
+                last_valid_month = rec->date.tm_mon;
 
         char buf[18];
-        strftime(buf, sizeof(buf), "%Y/%m/%d %H:%M", &(rec.date));
-        debug("DATA: %s : %f W\n", buf, rec.watts);
+        strftime(buf, sizeof(buf), "%Y/%m/%d %H:%M", &(rec->date));
+        debug("DATA: %s : %f W\n", buf, rec->watts);
         if (dumping_history) {
-                verbose("Dump history... (%d stored)\n", rec_id);
-                history[rec_id++] = &rec;
+                verbose("Dump history... (%d stored)\n", rec_id + 2);
+                history[++rec_id] = rec;
                 return 0;
         }
 
-        if (dump_data(&rec)) {
+        if (dump_data(rec)) {
                 fprintf(stderr, "ERROR: Could not dump current data.\n");
                 return -1;
         }
+        free(rec);
         sleep(45);
         return 0;
 }
@@ -302,8 +303,8 @@ prepare_device(void)
         usb_detach_kernel_driver_np(owl_dev.hdev, 0);
 
         if (usb_set_configuration(owl_dev.hdev,
-                                  owl_dev.usb_dev->config[0].
-                                  bConfigurationValue)) {
+                                  owl_dev.usb_dev->
+                                  config[0].bConfigurationValue)) {
                 fprintf(stderr, "ERROR: usb_set_configuration: %s\n",
                         usb_strerror());
                 return -1;
