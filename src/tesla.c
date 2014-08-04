@@ -198,7 +198,7 @@ process(unsigned char *frame)
                 dumping_history = 0;
                 for (i = 0; i <= rec_id; ++i) {
                         verbose("Dump history... done. (%d/%d stored)\n", i + 1,
-                                rec_id + 2);
+                                rec_id + 1);
                         if (dump_data(history[i])) {
                                 fprintf(stderr,
                                         "ERROR: Could not dump current data.\n");
