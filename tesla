@@ -19,7 +19,6 @@ NAME=tesla
 DESC="Tesla Energy Daemon"
 DAEMON=/usr/local/bin/tesla
 DEFAULT_PATH=/var/lib/tesla.rrd
-TESLA_OPTS=
 PIDFILE=/var/run/tesla/tesla.pid
 
 # Exit if the package is not installed
@@ -35,7 +34,7 @@ tesla_start () {
 
     start-stop-daemon --start --quiet --make-pidfile \
     --pidfile $PIDFILE --background \
-    --exec ${DAEMON} -- "${TESLA_OPTS} ${DEFAULT_PATH}"
+    --exec ${DAEMON} -- ${DEFAULT_PATH}
     log_end_msg $?
 }
 
