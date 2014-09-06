@@ -1,5 +1,5 @@
 cmake_minimum_required( VERSION 2.8 )
-set( CMAKE_BUILD_TYPE Release )
+set( CMAKE_BUILD_TYPE Release)
 project( tesla )
 include( FindPackageHandleStandardArgs )
 
@@ -7,7 +7,7 @@ set( TESLA_SOURCE_FILES src/tesla.c src/tesla.h)
 
 find_package( PkgConfig REQUIRED )
 
-pkg_search_module( LIBUSB REQUIRED libusb )
+pkg_search_module( LIBUSB REQUIRED libusb-1.0 )
 if( LIBUSB_FOUND )
   message( STATUS "LIBUSB found at: ${LIBUSB_LIBRARIES}" )
 else()

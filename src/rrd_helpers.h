@@ -25,5 +25,5 @@
 #include <time.h>
 #include <rrd.h>
 
-int RRD_create(char *rrd, unsigned int step);
-int RRD_update(char *rrd, unsigned int value, long process_time);
+int RRD_create(char *rrd, const unsigned int step);
+int RRD_update(char *rrd, const unsigned int value, const long process_time);

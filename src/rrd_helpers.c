@@ -24,7 +24,7 @@
 #include "tesla.h"
 
 int
-RRD_update(char *rrd, unsigned int value, long process_time)
+RRD_update(char *rrd, const unsigned int value, const long process_time)
 {
         char val[20];
 
@@ -44,12 +44,12 @@ RRD_update(char *rrd, unsigned int value, long process_time)
                         rrd_get_error());
                 return -1;
         }
-        verbose("Updated rrd %s with value %s\n", rrd, val);
+        DPRINTF(1, "Updated rrd %s with value %s\n", rrd, val);
         return 0;
 }
 
 int
-RRD_create(char *rrd, unsigned int step)
+RRD_create(char *rrd, const unsigned int step)
 {
         char *argv[12];
         int argc = 0;
@@ -108,6 +108,6 @@ RRD_create(char *rrd, unsigned int step)
                 fprintf(stderr, "ERROR: RRD_create: %s\n", rrd_get_error());
                 return -1;
         }
-        verbose("Created rrd %s\n", rrd);
+        DPRINTF(1, "Created rrd %s\n", rrd);
         return 0;
 }
