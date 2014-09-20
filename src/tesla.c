@@ -42,6 +42,11 @@ static libusb_context *ctx = NULL;
 static libusb_device **devs;
 static libusb_device_handle *dev_handle;
 
+static const char EMPTY_MSG[11] =
+    { 0x59, 0xFF, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0x50
+};
+
 void sigint_handler(const int sig);
 static int dump_data(struct record_data *rec);
 static void decode(const unsigned char *frame, struct record_data *rec);
@@ -148,7 +153,10 @@ process(unsigned char *frame)
                 DPRINTF(2, "0x%02x - ", frame[i]);
         DPRINTF(2, "0x%02x\n", frame[10]);
 
-        if (!strncmp((char *)frame, ID_MSG, 11)) {
+        if (!strncmp((char *)frame, EMPTY_MSG, 11)) {
+                DPRINTF(2, "received EMPTY MSG\n");
+                return 0;
+        } else if (!strncmp((char *)frame, ID_MSG, 11)) {
                 DPRINTF(2, "received ID MSG\n");
                 *data = 0x5A;
         } else if (!strncmp((char *)frame, WAIT_MSG, 11)) {
@@ -169,9 +177,7 @@ process(unsigned char *frame)
                 DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, *data);
                 return 0;
         }
-        // We don't care abouth LIVE frame, each LIVE frame is sent a little
-        // while and after (10/15s) as an HISTORY one.
-        // This allow us to take the HISTORY on the device into account
+
         if ((dumping_history && frame[0] == FRAME_ID_LIVE)
             || rec_id >= HISTORY_SIZE) {
                 dumping_history = 0;
@@ -188,13 +194,15 @@ process(unsigned char *frame)
                 return 0;
         }
 
-        if (frame[0] != FRAME_ID_DB) {
+        if (dumping_history == 0 && frame[0] == FRAME_ID_DB) {
+                fprintf(stderr, "Don't care about DB frame if not dumping.\n");
                 fprintf(stderr, "ERROR: Invalid ID 0x%x\n", frame[0]);
                 for (i = 0; i < 10; ++i)
                         DPRINTF(2, "0x%02x - ", frame[i]);
                 DPRINTF(2, "0x%02x\n", frame[10]);
                 return 0;
         }
+
         // Compute checksum (sumup the 10 first elements)
         for (i = 0; i < 10; ++i)
                 checksum += frame[i];

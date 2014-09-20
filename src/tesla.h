@@ -40,6 +40,7 @@
         do {                                            \
                 if (_debug >= level)                    \
                         printf(__VA_ARGS__);            \
+                        fflush(stdout);                 \
         } while(0)
 
 // DEV_ID and PID
