@@ -51,7 +51,7 @@ RRD_update(char *rrd, const unsigned int value, const long process_time)
 int
 RRD_create(char *rrd, const unsigned int step)
 {
-        char *argv[12];
+        char *argv[13];
         int argc = 0;
         char s[16], start[64];
         char energy[64];

@@ -24,8 +24,6 @@
 #include "tesla.h"
 #include "rrd_helpers.h"
 
-/* struct cm160_device owl_dev; */
-
 struct record_data *history[HISTORY_SIZE] = { 0 };
 
 int dumping_history = 1;
@@ -34,14 +32,15 @@ int rec_id = -1;
 int _debug = 0;
 char DBPATH[PATH_MAX] = "/var/lib/tesla.rrd";
 
-static const char ID_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56, 0x30,
-        0x30, 0x31, 0x01
-};
+static const char ID_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56,
+        0x30, 0x30, 0x31, 0x01 };
 
-static const char WAIT_MSG[11] =
-    { 0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49, 0x54,
-        0x50, 0x43, 0x52
-};
+static const char WAIT_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49,
+        0x54, 0x50, 0x43, 0x52 };
+
+static libusb_context *ctx = NULL;
+static libusb_device **devs;
+static libusb_device_handle *dev_handle;
 
 void sigint_handler(const int sig);
 static int dump_data(struct record_data *rec);
@@ -118,7 +117,7 @@ scan_usb(void)
         libusb_set_debug(ctx, _debug > 3 ? 3 : _debug);
 
         const size_t cnt = libusb_get_device_list(ctx, &devs);
-        if (cnt < 0) {
+        if (cnt == 0) {
                 fprintf(stderr, "Could get device list: %s\n",
                         libusb_strerror(ret));
                 return -1;
@@ -136,7 +135,7 @@ static int
 process(unsigned char *frame)
 {
         int i, ret;
-        unsigned char data[1] = { 0x00 };
+        unsigned char *data = 0x00;
         unsigned int checksum = 0;
         static int last_valid_month = 0;
 
@@ -151,24 +150,23 @@ process(unsigned char *frame)
 
         if (!strncmp((char *)frame, ID_MSG, 11)) {
                 DPRINTF(2, "received ID MSG\n");
-                data[0] = 0x5A;
+                *data = 0x5A;
         } else if (!strncmp((char *)frame, WAIT_MSG, 11)) {
                 DPRINTF(2, "received WAIT MSG\n");
-                data[0] = 0xA5;
+                *data = 0xA5;
         }
 
         int transferred;
-        if (data[0] == 0xA5 || data[0] == 0x5A) {
+        if (*data == 0xA5 || *data == 0x5A) {
                 ret =
-                    libusb_bulk_transfer(dev_handle, BULK_EP_OUT, (char *)&data,
-                                         sizeof(data), &transferred, 1000);
+                    libusb_bulk_transfer(dev_handle, BULK_EP_OUT, data,
+                                         sizeof(char), &transferred, 1000);
                 if (ret < 0) {
                         fprintf(stderr, "ERROR: bulk_write returned %d (%s)\n",
                                 ret, libusb_strerror(ret));
                         return -1;
                 }
-                DPRINTF(2, "wrote %d bytes: %08x\n", transferred,
-                        (const char *)&data);
+                DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, *data);
                 return 0;
         }
         // We don't care abouth LIVE frame, each LIVE frame is sent a little
@@ -292,11 +290,12 @@ prepare_device(void)
         DPRINTF(2, "Claimed interface.\n");
 
         // Set the baudrate at the correct speed to talk to the device
-        int baudrate = 250000;
+        const char *baudrate = "250000";
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
                                 UART_ENABLE, 0, NULL, 0, 500);
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_SET_BAUDRATE, 0, 0,
-                                (char *)&baudrate, sizeof(baudrate), 500);
+                        (void *)baudrate, sizeof(char) * strlen(baudrate),
+                        500);
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
                                 UART_DISABLE, 0, NULL, 0, 500);
         return 0;

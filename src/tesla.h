@@ -74,7 +74,3 @@ struct record_data {
 };
 
 extern int _debug;
-static libusb_context *ctx = NULL;
-static libusb_device **devs;
-static libusb_device *dev;
-static libusb_device_handle *dev_handle;

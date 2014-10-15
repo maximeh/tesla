@@ -1,5 +1,9 @@
 cmake_minimum_required( VERSION 2.8 )
 set( CMAKE_BUILD_TYPE Release)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+
 project( tesla )
 include( FindPackageHandleStandardArgs )
 
