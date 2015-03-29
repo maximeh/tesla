@@ -139,7 +139,7 @@ scan_usb(void)
 static int
 process(unsigned char *frame)
 {
-        int i, ret;
+        int i, ret = 0;
         unsigned char *data = 0x00;
         unsigned int checksum = 0;
         static int last_valid_month = 0;
@@ -155,7 +155,7 @@ process(unsigned char *frame)
 
         if (!strncmp((char *)frame, EMPTY_MSG, 11)) {
                 DPRINTF(2, "received EMPTY MSG\n");
-                return 0;
+                goto out;
         } else if (!strncmp((char *)frame, ID_MSG, 11)) {
                 DPRINTF(2, "received ID MSG\n");
                 *data = 0x5A;
@@ -172,10 +172,11 @@ process(unsigned char *frame)
                 if (ret < 0) {
                         fprintf(stderr, "ERROR: bulk_write returned %d (%s)\n",
                                 ret, libusb_strerror(ret));
-                        return -1;
+                        ret = -1;
+                        goto out;
                 }
                 DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, *data);
-                return 0;
+                goto out;
         }
 
         if ((dumping_history && frame[0] == FRAME_ID_LIVE)
@@ -187,11 +188,12 @@ process(unsigned char *frame)
                         if (dump_data(history[i])) {
                                 fprintf(stderr,
                                         "ERROR: Could not dump current data.\n");
-                                return -1;
+                                ret = -1;
+                                goto out;
                         }
                         free(history[i]);
                 }
-                return 0;
+                goto out;
         }
 
         if (dumping_history == 0 && frame[0] == FRAME_ID_DB) {
@@ -200,7 +202,7 @@ process(unsigned char *frame)
                 for (i = 0; i < 10; ++i)
                         DPRINTF(2, "0x%02x - ", frame[i]);
                 DPRINTF(2, "0x%02x\n", frame[10]);
-                return 0;
+                goto out;
         }
 
         // Compute checksum (sumup the 10 first elements)
@@ -215,7 +217,8 @@ process(unsigned char *frame)
                 fprintf(stderr,
                         "ERROR: Invalid checksum: expected 0x%x, got 0x%x\n",
                         frame[10], checksum);
-                return -1;
+                ret = -1;
+                goto out;
         }
 
         decode(frame, rec);
@@ -234,15 +237,18 @@ process(unsigned char *frame)
         if (dumping_history) {
                 DPRINTF(1, "Dump history... (%d stored)\n", rec_id + 2);
                 history[++rec_id] = rec;
-                return 0;
+                goto out;
         }
 
         if (dump_data(rec)) {
                 fprintf(stderr, "ERROR: Could not dump current data.\n");
-                return -1;
+                ret = -1;
+                goto out;
         }
+
+out:
         free(rec);
-        return 0;
+        return ret;
 }
 
 static int
