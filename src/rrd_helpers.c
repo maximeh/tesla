@@ -20,8 +20,11 @@
  *
  */
 
-#include "rrd_helpers.h"
-#include "tesla.h"
+#include <getopt.h>    // for opterr, optind
+#include <rrd.h>       // for rrd_clear_error, rrd_get_error, etc
+#include <stdio.h>     // for fprintf, sprintf, stderr, perror
+#include <sys/time.h>  // for gettimeofday, timeval
+#include "tesla.h"     // for DPRINTF
 
 int
 RRD_update(char *rrd, const unsigned int value, const long process_time)

@@ -1,4 +1,4 @@
-// vim: set expandtab:set tabstop=2
+/* vim: set expandtab:set tabstop=2 */
 /*
  * rrd_helpers
  *
@@ -19,11 +19,6 @@
  * 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
-
-#pragma once
-
-#include <time.h>
-#include <rrd.h>
 
 int RRD_create(char *rrd, const unsigned int step);
 int RRD_update(char *rrd, const unsigned int value, const long process_time);

@@ -1,4 +1,4 @@
-// vim: set expandtab:set tabstop=2
+/* vim: set expandtab:set tabstop=2 */
 /*
  * tesla
  *
@@ -22,55 +22,27 @@
  */
 
 #include "tesla.h"
-#include "rrd_helpers.h"
-
-struct record_data *history[HISTORY_SIZE] = { 0 };
-
-int dumping_history = 1;
-int rec_id = -1;
+#include <getopt.h>       // for getopt, optind
+#include <limits.h>       // for PATH_MAX
+#include <signal.h>       // for signal, SIGINT
+#include <stddef.h>       // for size_t
+#include <stdlib.h>       // for free, calloc, exit, realpath
+#include <string.h>       // for strncmp, memset, strlen
+#include <unistd.h>       // for access, F_OK
+#include "rrd_helpers.h"  // for RRD_create, RRD_update
 
 int _debug = 0;
-char DBPATH[PATH_MAX] = "/var/lib/tesla.rrd";
 
-static const char ID_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56,
-        0x30, 0x30, 0x31, 0x01 };
-
-static const char WAIT_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49,
-        0x54, 0x50, 0x43, 0x52 };
-
-static libusb_context *ctx = NULL;
-static libusb_device **devs;
-static libusb_device_handle *dev_handle;
-
-static const char EMPTY_MSG[11] =
-    { 0x59, 0xFF, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff, 0xff, 0x50
-};
-
-void sigint_handler(const int sig);
-static int dump_data(struct record_data *rec);
-static void decode(const unsigned char *frame, struct record_data *rec);
-static int prepare_device(void);
-static int scan_usb(void);
-static int process(unsigned char *frame);
-static int get_data(void);
-static inline void usage();
+volatile sig_atomic_t stop = 0;
 
 void
 sigint_handler(const int sig)
 {
-        DPRINTF(2, "\nClosing connection with the device\n");
-
-        libusb_release_interface(dev_handle, INTERFACE);
-        libusb_reset_device(dev_handle);
-        libusb_close(dev_handle);
-        libusb_exit(ctx);
-
-        exit(0);
+        stop = 1;
 }
 
 static int
-dump_data(struct record_data *rec)
+dump_data(char *dbpath, struct record_data *rec)
 {
         time_t epoch;
         struct tm *time_utc;
@@ -90,7 +62,8 @@ dump_data(struct record_data *rec)
                 return -1;
         }
 
-        RRD_update(DBPATH, (unsigned int)rec->watts, (long)epoch);
+        /* We don't really care if it fails, we'll try again and that's it */
+        RRD_update(dbpath, (unsigned int)rec->watts, (long)epoch);
         return 0;
 }
 
@@ -112,8 +85,10 @@ decode(const unsigned char *frame, struct record_data *rec)
 }
 
 static int
-scan_usb(void)
+scan_usb(libusb_context *ctx, libusb_device_handle **dev_handle)
 {
+        libusb_device **devs;
+
         const int ret = libusb_init(&ctx);
         if (ret < 0) {
                 fprintf(stderr, "%s\n", libusb_strerror(ret));
@@ -123,26 +98,32 @@ scan_usb(void)
 
         const size_t cnt = libusb_get_device_list(ctx, &devs);
         if (cnt == 0) {
-                fprintf(stderr, "Could get device list: %s\n",
+                fprintf(stderr, "Could not get device list: %s\n",
                         libusb_strerror(ret));
                 return -1;
         }
 
-        dev_handle =
+        *dev_handle =
             libusb_open_device_with_vid_pid(ctx, OWL_VENDOR_ID, CM160_DEV_ID);
         libusb_free_device_list(devs, 1);
-        if (!dev_handle)
+        if (!*dev_handle) {
+                fprintf(stderr, "%s\n", libusb_strerror(ret));
                 return -1;
+        }
         return 0;
 }
 
 static int
-process(unsigned char *frame)
+process(char *dbpath, unsigned char *frame, libusb_device_handle *dev_handle)
 {
         int i, ret = 0;
-        unsigned char *data = 0x00;
+        unsigned char data = 0x00;
         unsigned int checksum = 0;
         static int last_valid_month = 0;
+
+        static struct record_data *history[HISTORY_SIZE] = { 0 };
+        static int dumping_history = 1;
+        static int rec_id = -1;
 
         struct record_data *rec = calloc(1, sizeof(struct record_data));
 
@@ -158,16 +139,16 @@ process(unsigned char *frame)
                 goto out;
         } else if (!strncmp((char *)frame, ID_MSG, 11)) {
                 DPRINTF(2, "received ID MSG\n");
-                *data = 0x5A;
+                data = 0x5A;
         } else if (!strncmp((char *)frame, WAIT_MSG, 11)) {
                 DPRINTF(2, "received WAIT MSG\n");
-                *data = 0xA5;
+                data = 0xA5;
         }
 
         int transferred;
-        if (*data == 0xA5 || *data == 0x5A) {
+        if (data == 0xA5 || data == 0x5A) {
                 ret =
-                    libusb_bulk_transfer(dev_handle, BULK_EP_OUT, data,
+                    libusb_bulk_transfer(dev_handle, BULK_EP_OUT, &data,
                                          sizeof(char), &transferred, 1000);
                 if (ret < 0) {
                         fprintf(stderr, "ERROR: bulk_write returned %d (%s)\n",
@@ -175,7 +156,7 @@ process(unsigned char *frame)
                         ret = -1;
                         goto out;
                 }
-                DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, *data);
+                DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, data);
                 goto out;
         }
 
@@ -185,7 +166,7 @@ process(unsigned char *frame)
                 for (i = 0; i <= rec_id; ++i) {
                         DPRINTF(1, "Dump history... done. (%d/%d stored)\n",
                                 i + 1, rec_id + 1);
-                        if (dump_data(history[i])) {
+                        if (dump_data(dbpath, history[i])) {
                                 fprintf(stderr,
                                         "ERROR: Could not dump current data.\n");
                                 ret = -1;
@@ -193,7 +174,7 @@ process(unsigned char *frame)
                         }
                         free(history[i]);
                 }
-                goto out;
+                return 0;
         }
 
         if (dumping_history == 0 && frame[0] == FRAME_ID_DB) {
@@ -223,9 +204,8 @@ process(unsigned char *frame)
 
         decode(frame, rec);
 
-        // There seem to be an issues with the month, some time they wind up getting
-        // crazy value.
-        // Don't know why...
+        /* There seem to be an issues with the month, some time they wind up
+         * getting crazy value. Don't know why... */
         if (rec->date.tm_mon < 0 || rec->date.tm_mon > 11)
                 rec->date.tm_mon = last_valid_month;
         else
@@ -237,10 +217,10 @@ process(unsigned char *frame)
         if (dumping_history) {
                 DPRINTF(1, "Dump history... (%d stored)\n", rec_id + 2);
                 history[++rec_id] = rec;
-                goto out;
+                return 0;
         }
 
-        if (dump_data(rec)) {
+        if (dump_data(dbpath, rec)) {
                 fprintf(stderr, "ERROR: Could not dump current data.\n");
                 ret = -1;
                 goto out;
@@ -252,15 +232,15 @@ out:
 }
 
 static int
-get_data(void)
+get_data(char* dbpath, libusb_device_handle *dev_handle)
 {
         unsigned char buffer[512];
         int transferred;
         memset(buffer, 0, sizeof(buffer));
 
-        // The call here is blocking and we did set an infinite timeout
-        // The device is sending wait message regularly, so we can just loop on
-        // this without consumming CPU nor needing to poll().
+        /* The call here is blocking and we did set an infinite timeout. The
+         * device is sending wait message regularly, so we can just loop on
+         * this without consumming CPU nor needing to poll(). */
         const int ret = libusb_bulk_transfer(dev_handle, BULK_EP_IN, buffer,
                                              sizeof(buffer), &transferred, 0);
         if (ret) {
@@ -275,7 +255,7 @@ get_data(void)
 
         DPRINTF(2, "nb words: %d\n", nb_words);
         while (nb_words--) {
-                if (process(bufptr)) {
+                if (process(dbpath, bufptr, dev_handle)) {
                         fprintf(stderr, "ERROR: process detected an error.\n");
                         return -1;
                 }
@@ -285,7 +265,7 @@ get_data(void)
 }
 
 static int
-prepare_device(void)
+prepare_device(libusb_device_handle *dev_handle)
 {
         if (libusb_kernel_driver_active(dev_handle, INTERFACE)) {
                 DPRINTF(2, "Kernel Driver Active.\n");
@@ -303,13 +283,12 @@ prepare_device(void)
 
         DPRINTF(2, "Claimed interface.\n");
 
-        // Set the baudrate at the correct speed to talk to the device
-        const char *baudrate = "250000";
+        /* Set the baudrate at the correct speed to talk to the device */
+        int baudrate = 250000;
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
                                 UART_ENABLE, 0, NULL, 0, 500);
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_SET_BAUDRATE, 0, 0,
-                        (void *)baudrate, sizeof(char) * strlen(baudrate),
-                        500);
+                        (void *)&baudrate, sizeof(baudrate), 500);
         libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
                                 UART_DISABLE, 0, NULL, 0, 500);
         return 0;
@@ -326,10 +305,13 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+        char dbpath[PATH_MAX] = "/var/lib/tesla.rrd";
+        libusb_context *ctx = NULL;
+        libusb_device_handle *dev_handle = NULL;
 
         signal(SIGINT, sigint_handler);
 
-        int c;
+        int c, ret = 0;
         while ((c = getopt(argc, argv, "hd")) != -1) {
                 switch (c) {
                 case 'd':
@@ -344,37 +326,46 @@ main(int argc, char **argv)
         argc -= optind;
         argv += optind;
 
-        // Check that we are the root user
-        if (geteuid()) {
-                fprintf(stderr, "ERROR: You need to be root.\n");
-                return -1;
-        }
         if (argc == 1)
-                realpath(argv[0], DBPATH);
+                realpath(argv[0], dbpath);
 
-        if (access(DBPATH, F_OK) == -1) {
-                DPRINTF(1, "Creating db: %s\n", DBPATH);
-                if (RRD_create(DBPATH, 60))
+        if (access(dbpath, F_OK) == -1) {
+                DPRINTF(1, "Creating db: %s\n", dbpath);
+                if (RRD_create(dbpath, 60))
                         return -1;
         }
-        DPRINTF(2, "Using DB: %s\n", DBPATH);
+        DPRINTF(2, "Using DB: %s\n", dbpath);
 
         DPRINTF(1, "Please plug your CM160 device...\n");
-        while (scan_usb())
-                sleep(5);
-
-        if (prepare_device())
+        ret = scan_usb(ctx, &dev_handle);
+        if (ret) {
+                fprintf(stderr, "We found the device but could not open it.\n");
                 return -1;
+        }
+
+        if (prepare_device(dev_handle)) {
+                fprintf(stderr, "Could not prepare the device.\n");
+                return -1;
+        }
 
         DPRINTF(1, "Start acquiring data...\n");
 
-        while (!get_data()) ;
+        while (!stop)
+        {
+                ret = get_data(dbpath, dev_handle);
+                if (ret) {
+                        fprintf(stderr, "Error getting data.\n");
+                        return -1;
+                }
+        }
 
-        const int ret = libusb_release_interface(dev_handle, INTERFACE);
+        DPRINTF(2, "\nClosing connection with the device\n");
+        ret = libusb_release_interface(dev_handle, INTERFACE);
         if (ret) {
                 fprintf(stderr, "Cannot release interface.\n");
                 return -1;
         }
+        libusb_reset_device(dev_handle);
         libusb_close(dev_handle);
         libusb_exit(ctx);
 

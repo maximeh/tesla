@@ -21,20 +21,13 @@
  *
  */
 
-#pragma once
+#ifndef _TESLA_H
+#define _TESLA_H
 
 #define _XOPEN_SOURCE 500
-#include <fcntl.h>
 #include <libusb-1.0/libusb.h>
-#include <signal.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
+#include <stdio.h>              // for fflush, printf, stdout
+#include <time.h>               // for tm
 
 #define DPRINTF(level, ...)                             \
         do {                                            \
@@ -74,4 +67,13 @@ struct record_data {
         double amps;
 };
 
+static const char ID_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x43, 0x4D, 0x56,
+        0x30, 0x30, 0x31, 0x01 };
+static const char WAIT_MSG[11] = { 0xA9, 0x49, 0x44, 0x54, 0x57, 0x41, 0x49,
+        0x54, 0x50, 0x43, 0x52 };
+static const char EMPTY_MSG[11] = { 0x59, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0x50 };
+
 extern int _debug;
+
+#endif /* _TESLA_H */
