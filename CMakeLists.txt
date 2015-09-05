@@ -2,7 +2,7 @@ cmake_minimum_required( VERSION 2.8 )
 set( CMAKE_BUILD_TYPE Release )
 
 set( CMAKE_VERBOSE_MAKEFILE ON )
-set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wall" )
+set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wextra -Wno-unused -Werror -Wwrite-strings" )
 
 project( tesla )
 include( FindPackageHandleStandardArgs )
