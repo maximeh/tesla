@@ -19,5 +19,12 @@
  *
  */
 
-int RRD_create(char *rrd, const unsigned int step);
-int RRD_update(char *rrd, const unsigned int value, const long process_time);
+#pragma once
+
+#include <time.h>      // for time_t
+#include <stdint.h>    // for uint_fast16_t, uint_least16_t
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+
+int RRD_update(const char *rrd, const uint_fast16_t value, const time_t process_time);
+int RRD_create(const char *rrd, const uint_least16_t step);

@@ -19,28 +19,29 @@
  *
  */
 
-#include <getopt.h>    // for opterr, optind
-#include <rrd.h>       // for rrd_clear_error, rrd_get_error, etc
-#include <stdio.h>     // for fprintf, sprintf, stderr, perror
+#include "rrd_helpers.h"
+#include <rrd.h>       // for rrd_clear_error, rrd_get_error, rrd_test_error
+#include <stdint.h>    // for uint_fast16_t, uint_least16_t
+#include <stdio.h>     // for fprintf, sprintf, stderr, perror, NULL
 #include <sys/time.h>  // for gettimeofday, timeval
+#include <time.h>      // for time_t
 #include "tesla.h"     // for DPRINTF
 
 int
-RRD_update(char *rrd, const unsigned int value, const long process_time)
+RRD_update(const char *rrd,
+	const uint_fast16_t value, const time_t process_time)
 {
 	char val[20];
-
-	if (sprintf(val, "%ld:%u", process_time, value) < 0) {
+	if (sprintf(val, "%ld:%lu", process_time, value) < 0) {
 		fprintf(stderr, "ERROR: Could not create string 'val'.\n");
 		return -1;
 	}
 
-	char *argv[3] = { "dummy", rrd, val };
-
-	optind = 0;
-	opterr = 0;
 	rrd_clear_error();
-	rrd_update(3, argv);
+
+	const char *argv[] = { val };
+	rrd_update_r(rrd, NULL, 1, argv);
+
 	if (rrd_test_error()) {
 		fprintf(stderr, "ERROR: RRD_update (%s): %s\n", rrd,
 				rrd_get_error());
@@ -51,65 +52,41 @@ RRD_update(char *rrd, const unsigned int value, const long process_time)
 }
 
 int
-RRD_create(char *rrd, const unsigned int step)
+RRD_create(const char *rrd, const uint_least16_t step)
 {
-	char *argv[13];
-	int argc = 0;
-	char s[16], start[64];
-	char energy[64];
-	struct timeval tv;
 
+	struct timeval tv;
 	if (gettimeofday(&tv, NULL)) {
 		perror("RRD_create");
 		return -1;
 	}
+	time_t time_start = tv.tv_sec - 2629743;
 
-	argv[argc++] = "dummy";
-	argv[argc++] = rrd;
-	argv[argc++] = "--step";
-	if (sprintf(s, "%u", step) < 0) {
-		fprintf(stderr, "ERROR: Could not create string 's'.\n");
-		return -1;
-	}
+	/* http://anders.olssons.info/_other/rrdcalc.html */
+	const char *argv[] = {
+		"DS:energy:GAUGE:240:0:U",
+		"RRA:LAST:0.5:1:1",
+		"RRA:AVERAGE:0.5:1:144",
+		"RRA:AVERAGE:0.5:1:1440",
+		"RRA:AVERAGE:0.5:1:10080",
+		"RRA:AVERAGE:0.5:1:43800",
+		"RRA:AVERAGE:0.5:10:52596",
+		"RRA:MAX:0.5:1:144",
+		"RRA:MAX:0.5:1:1440",
+		"RRA:MAX:0.5:1:10080",
+		"RRA:MAX:0.5:1:43800",
+		"RRA:MAX:0.5:10:52596",
+		"RRA:MIN:0.5:1:144",
+		"RRA:MIN:0.5:1:1440",
+		"RRA:MIN:0.5:1:10080",
+		"RRA:MIN:0.5:1:43800",
+		"RRA:MIN:0.5:10:52596"
+	};
 
-	argv[argc++] = s;
-	argv[argc++] = "--start";
-	/* Start a month ago, because that's the history that may be stored in
-	 * the device. */
-	if (sprintf(start, "%lu", (unsigned long)tv.tv_sec - 2629743) < 0) {
-		fprintf(stderr, "ERROR: Could not create string 'start'.\n");
-		return -1;
-	}
-
-	argv[argc++] = start;
-	if (sprintf(energy, "DS:energy:GAUGE:60:0:U") < 0) {
-		fprintf(stderr, "ERROR: Could not create string 'energy'.\n");
-		return -1;
-	}
-
-	argv[argc++] = energy;
-	/* Keep the last value */
-	argv[argc++] = "RRA:LAST:0.5:1:1";
-
-	/* http://eccentric.cx/misc/rrdcalc.html */
-	/* Hourly, keep 1 data every step (60s), keep 60 of them, 60*60 = 1h */
-	argv[argc++] = "RRA:AVERAGE:0.5:1:60";
-	/* Daily, keep 1 cons. data every 30 step, keep 48 of them.
-	 * 60*30*48 = 24h */
-	argv[argc++] = "RRA:AVERAGE:0.5:30:48";
-	/* Weekly, every 720 data, keep one, keep 14 of them.
-	 * 720*60*14 = 1 week */
-	argv[argc++] = "RRA:AVERAGE:0.5:720:14";
-	/* Monthly, every 1440 data, keep one. Keep 30 of them.
-	 * 1440*60*30 = 1 month */
-	argv[argc++] = "RRA:AVERAGE:0.5:1440:30";
-	/* Yearly, every 10080 minutes (a week), keep one. Keep 52 of them. */
-	argv[argc++] = "RRA:AVERAGE:0.5:10080:52";
-
-	optind = 0;
-	opterr = 0;
 	rrd_clear_error();
-	rrd_create(argc, argv);
+
+	rrd_create_r(rrd, step, time_start, ARRAY_SIZE(argv), argv);
+
 	if (rrd_test_error()) {
 		fprintf(stderr, "ERROR: RRD_create: %s\n", rrd_get_error());
 		return -1;

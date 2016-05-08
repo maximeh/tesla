@@ -21,14 +21,15 @@
  */
 
 #include "tesla.h"
-#include <getopt.h>       // for getopt, optind
-#include <limits.h>       // for PATH_MAX
-#include <signal.h>       // for signal, SIGINT
-#include <stddef.h>       // for size_t
-#include <stdlib.h>       // for free, calloc, exit, realpath
-#include <string.h>       // for strncmp, memset, strlen
-#include <unistd.h>       // for access, F_OK
-#include "rrd_helpers.h"  // for RRD_create, RRD_update
+#include "rrd_helpers.h"
+#include <getopt.h>  // for getopt, optind
+#include <limits.h>  // for PATH_MAX
+#include <signal.h>  // for signal, SIGINT, sig_atomic_t
+#include <stdio.h>   // for fprintf, stderr, NULL, fputs, stdout
+#include <stdlib.h>  // for calloc, free, realpath
+#include <string.h>  // for memcmp, memcpy
+#include <time.h>    // for tm, mktime, gmtime, strftime, time_t
+#include <unistd.h>  // for access, F_OK, ssize_t
 
 int _debug = 0;
 
@@ -41,7 +42,7 @@ sigint_handler(const int sig)
 }
 
 static int
-dump_data(char *dbpath, struct record_data *rec)
+append_record_rrd(const char *dbpath, struct record_data *rec)
 {
 	time_t epoch;
 	struct tm *time_utc;
@@ -62,14 +63,13 @@ dump_data(char *dbpath, struct record_data *rec)
 	}
 
 	/* We don't really care if it fails, we'll try again and that's it */
-	RRD_update(dbpath, (unsigned int)rec->watts, (long)epoch);
+	RRD_update(dbpath, rec->watts, epoch);
 	return 0;
 }
 
 static void
-decode(const unsigned char *frame, struct record_data *rec)
+decode(const uint_fast8_t *frame, struct record_data *rec)
 {
-	const int volt = 230;
 	/* Device send only 13 for 2013, struct tm, take its year from 1900 */
 	rec->date.tm_year = frame[1] + 100;
 	/* struct tm is 0-11, the device send 1-12 */
@@ -80,7 +80,7 @@ decode(const unsigned char *frame, struct record_data *rec)
 	/* mean intensity during one minute */
 	rec->amps = (frame[8] + (frame[9] << 8)) * 0.07;
 	/* mean power during one minute */
-	rec->watts = rec->amps * volt;
+	rec->watts = rec->amps * VOLT;
 }
 
 static int
@@ -95,93 +95,96 @@ scan_usb(libusb_context *ctx, libusb_device_handle **dev_handle)
 	}
 	libusb_set_debug(ctx, _debug > 3 ? 3 : _debug);
 
-	const size_t cnt = libusb_get_device_list(ctx, &devs);
+	const ssize_t cnt = libusb_get_device_list(ctx, &devs);
 	if (cnt == 0) {
 		fprintf(stderr, "Could not get device list: %s\n",
 				libusb_strerror(ret));
 		return -1;
 	}
 
-	*dev_handle = libusb_open_device_with_vid_pid(ctx, OWL_VENDOR_ID, CM160_DEV_ID);
+	*dev_handle = libusb_open_device_with_vid_pid(ctx,
+			OWL_VENDOR_ID, CM160_DEV_ID);
 	libusb_free_device_list(devs, 1);
 	if (!*dev_handle) {
-		fprintf(stderr, "%s\n", libusb_strerror(ret));
+		fprintf(stderr, "Could not find an OWL CM160 plugged.\n");
 		return -1;
 	}
 	return 0;
 }
 
 static int
-process(char *dbpath, unsigned char *frame, libusb_device_handle *dev_handle)
+init_history(struct record_history **history)
 {
-	int i, ret = 0;
-	unsigned char data = 0x00;
-	unsigned int checksum = 0;
-	static int last_valid_month = 0;
-
-	static struct record_data *history[HISTORY_SIZE] = { 0 };
-	static int dumping_history = 1;
-	static int rec_id = -1;
-
-	struct record_data *rec = calloc(1, sizeof(struct record_data));
-
-	for (i = 0; i < 79; ++i)
-		DPRINTF(2, "-");
-	DPRINTF(2, "-\n");
-	for (i = 0; i < 10; ++i)
-		DPRINTF(2, "0x%02x - ", frame[i]);
-	DPRINTF(2, "0x%02x\n", frame[10]);
-
-	if (!strncmp((char *)frame, EMPTY_MSG, 11)) {
-		DPRINTF(2, "received EMPTY MSG\n");
-		goto out;
-	} else if (!strncmp((char *)frame, ID_MSG, 11)) {
-		DPRINTF(2, "received ID MSG\n");
-		data = 0x5A;
-	} else if (!strncmp((char *)frame, WAIT_MSG, 11)) {
-		DPRINTF(2, "received WAIT MSG\n");
-		data = 0xA5;
+	*history = calloc(1, sizeof(**history));
+	if (!*history) {
+		fprintf(stderr, "ERROR: Could not init history.\n");
+		return -1;
 	}
 
-	int transferred;
-	if (data == 0xA5 || data == 0x5A) {
-		ret = libusb_bulk_transfer(dev_handle, BULK_EP_OUT, &data,
-				sizeof(char), &transferred, 1000);
-		if (ret < 0) {
-			fprintf(stderr, "ERROR: bulk_write returned %d (%s)\n",
-					ret, libusb_strerror(ret));
+	(*history)->records = calloc(HISTORY_SIZE, sizeof(*(*history)->records));
+	if (!(*history)->records) {
+		fprintf(stderr, "ERROR: Could not init history->records.\n");
+		return -1;
+	}
+
+	(*history)->recording_history = 1;
+	(*history)->nb_record = 0;
+	return 0;
+}
+
+static void
+free_history_record(struct record_history *history)
+{
+	free(history->records);
+	history->records = NULL;
+}
+
+static void
+free_history(struct record_history *history)
+{
+	free_history_record(history);
+	free(history);
+	history = NULL;
+}
+
+static int
+write_history_rrd(const char *dbpath, struct record_history *hist)
+{
+	uint_fast16_t i;
+	int ret = 0;
+	hist->recording_history = 0;
+
+	for (i = 0; i < hist->nb_record; ++i) {
+		DPRINTF(1, "Write history... (%lu/%lu stored)\n",
+				i, hist->nb_record);
+		if (append_record_rrd(dbpath, hist->records + i)) {
+			fprintf(stderr, "ERROR: Could not dump current data.\n");
 			ret = -1;
-			goto out;
+			goto free_error;
 		}
-		DPRINTF(2, "wrote %d bytes: 0x%02x\n", transferred, data);
-		goto out;
 	}
 
-	if ((dumping_history && frame[0] == FRAME_ID_LIVE)
-			|| rec_id >= HISTORY_SIZE) {
-		dumping_history = 0;
-		for (i = 0; i <= rec_id; ++i) {
-			DPRINTF(1, "Dump history... done. (%d/%d stored)\n",
-					i + 1, rec_id + 1);
-			if (dump_data(dbpath, history[i])) {
-				fprintf(stderr,
-						"ERROR: Could not dump current data.\n");
-				ret = -1;
-				goto out;
-			}
-			free(history[i]);
-		}
-		return 0;
-	}
+	ret = 0;
 
-	if (dumping_history == 0 && frame[0] == FRAME_ID_DB) {
-		fprintf(stderr, "Don't care about DB frame if not dumping.\n");
-		fprintf(stderr, "ERROR: Invalid ID 0x%x\n", frame[0]);
-		for (i = 0; i < 10; ++i)
-			DPRINTF(2, "0x%02x - ", frame[i]);
-		DPRINTF(2, "0x%02x\n", frame[10]);
-		goto out;
-	}
+free_error:
+	free_history_record(hist);
+	return ret;
+}
+
+static int
+append_record_history(struct record_history *hist, struct record_data *rec)
+{
+	DPRINTF(1, "Recording history... (%lu stored)\n", hist->nb_record);
+	memcpy(hist->records+hist->nb_record, rec, sizeof(*rec));
+	hist->nb_record++;
+	return 0;
+}
+
+static int
+frame_valid(uint_fast8_t * frame)
+{
+	uint_fast8_t checksum = 0;
+	int i;
 
 	// Compute checksum (sumup the 10 first elements)
 	for (i = 0; i < 10; ++i)
@@ -193,47 +196,113 @@ process(char *dbpath, unsigned char *frame, libusb_device_handle *dev_handle)
 	// Checksum should be egal the 10nth element of the frame
 	if (checksum != frame[10]) {
 		fprintf(stderr,
-				"ERROR: Invalid checksum: expected 0x%x, got 0x%x\n",
-				frame[10], checksum);
-		ret = -1;
-		goto out;
+			"ERROR: Invalid checksum: expected 0x%x, got 0x%x\n",
+			frame[10], checksum);
+		return -1;
 	}
+	return 0;
+}
 
-	decode(frame, rec);
+static int
+ack_frame(libusb_device_handle *dev_handle, uint_fast8_t *frame)
+{
+	int transferred, ret = 0;
+	uint_fast8_t data = 0;
 
-	/* There seem to be an issues with the month, some time they wind up
-	 * getting crazy value. Don't know why... */
-	if (rec->date.tm_mon < 0 || rec->date.tm_mon > 11)
-		rec->date.tm_mon = last_valid_month;
-	else
-		last_valid_month = rec->date.tm_mon;
-
-	char buf[18];
-	strftime(buf, sizeof(buf), "%Y/%m/%d %H:%M", &(rec->date));
-	DPRINTF(2, "DATA: %s : %f W\n", buf, rec->watts);
-	if (dumping_history) {
-		DPRINTF(1, "Dump history... (%d stored)\n", rec_id + 2);
-		history[++rec_id] = rec;
+	if (!memcmp(frame, EMPTY_MSG, 11)) {
+		DPRINTF(2, "received EMPTY MSG\n");
+		return 1;
+	} else if (!memcmp(frame, ID_MSG, 11)) {
+		DPRINTF(2, "received ID MSG\n");
+		data = 0x5A;
+	} else if (!memcmp(frame, WAIT_MSG, 11)) {
+		DPRINTF(2, "received WAIT MSG\n");
+		data = 0xA5;
+	} else {
 		return 0;
 	}
 
-	if (dump_data(dbpath, rec)) {
-		fprintf(stderr, "ERROR: Could not dump current data.\n");
-		ret = -1;
-		goto out;
+	ret = libusb_bulk_transfer(dev_handle, BULK_EP_OUT,
+			&data, sizeof(data), &transferred, 1000);
+	if (ret < 0) {
+		fprintf(stderr, "ERROR: bulk_write returned %d (%s)\n",
+				ret, libusb_strerror(ret));
+		return -1;
+	}
+	DPRINTF(2, "Wrote %d bytes: 0x%02x\n", transferred, data);
+	return 1;
+}
+
+static int
+process_frame(const char *dbpath, uint_fast8_t *frame,
+		struct record_history *hist, libusb_device_handle *dev_handle)
+{
+	int i, ret = 0;
+	static int last_valid_month = 0;
+
+	for (i = 0; i < 73; ++i)
+		DPRINTF(2, "-");
+	DPRINTF(2, "-\n");
+	for (i = 0; i < 10; ++i)
+		DPRINTF(2, "0x%02x - ", frame[i]);
+	DPRINTF(2, "0x%02x\n", frame[10]);
+
+	/* If a frame is acked, we need to treat the next one */
+	ret = ack_frame(dev_handle, frame);
+	if (ret < 0)
+		return ret;
+	if (ret > 0)
+		return 0;
+
+	/* Either the history dump is finished (we have received a live frame)
+	 * or the history is full */
+	if ((hist->recording_history && frame[0] == FRAME_ID_LIVE)
+			|| hist->nb_record >= HISTORY_SIZE)
+		return write_history_rrd(dbpath, hist);
+
+	/* The frame is history, but we are not recording/dumping it, so we
+	 * don't care. Wait for the next frame. */
+	if (hist->recording_history == 0 && frame[0] == FRAME_ID_DB) {
+		fprintf(stderr, "Received DB frame, expected LIVE frame.\n");
+		fprintf(stderr, "WARNING: Invalid ID 0x%x\n", frame[0]);
+		return 0;
 	}
 
-out:
-	free(rec);
+	if (frame_valid(frame))
+		return -1;
+
+	struct record_data rec = {0};
+	decode(frame, &rec);
+
+	/* There seem to be an issues with the month, some time they wind up
+	 * getting crazy value. Don't know why... */
+	if (rec.date.tm_mon < 0 || rec.date.tm_mon > 11)
+		rec.date.tm_mon = last_valid_month;
+	else
+		last_valid_month = rec.date.tm_mon;
+
+	char buf[18];
+	strftime(buf, sizeof(buf), "%Y/%m/%d %H:%M", &(rec.date));
+	DPRINTF(2, "DATA: %s : %lu W\n", buf, rec.watts);
+	if (hist->recording_history)
+		return append_record_history(hist, &rec);
+
+	if (append_record_rrd(dbpath, &rec)) {
+		fprintf(stderr, "ERROR: Could not append current record.\n");
+		ret = -1;
+	}
+
 	return ret;
 }
 
 static int
-get_data(char* dbpath, libusb_device_handle *dev_handle)
+get_data(const char* dbpath, struct record_history *hist,
+		libusb_device_handle *dev_handle)
 {
-	unsigned char buffer[512];
+	/* The buffer size is arbitrary */
+	uint_fast8_t buffer[512] = {0};
+	uint_fast8_t *bufptr = &buffer[0];
 	int transferred;
-	memset(buffer, 0, sizeof(buffer));
 
 	/* The call here is blocking and we did set an infinite timeout. The
 	 * device is sending wait message regularly, so we can just loop on
@@ -245,19 +314,18 @@ get_data(char* dbpath, libusb_device_handle *dev_handle)
 				libusb_strerror(ret));
 		return -1;
 	}
-	DPRINTF(2, "read %d bytes: \n", transferred);
+	DPRINTF(2, "read %d bytes.\n", transferred);
 
-	unsigned char *bufptr = (unsigned char *)buffer;
-	/* incomplete words are resent */
-	int nb_words = transferred / 11;
+	/* incomplete frames are resent */
+	int nb_frames = transferred / FRAME_SIZE;
 
-	DPRINTF(2, "nb words: %d\n", nb_words);
-	while (nb_words--) {
-		if (process(dbpath, bufptr, dev_handle)) {
+	DPRINTF(2, "Treat nb frames: %d\n", nb_frames);
+	while (nb_frames--) {
+		if (process_frame(dbpath, bufptr, hist, dev_handle)) {
 			fprintf(stderr, "ERROR: process detected an error.\n");
 			return -1;
 		}
-		bufptr += 11;
+		bufptr += FRAME_SIZE;
 	}
 	return 0;
 }
@@ -283,12 +351,13 @@ prepare_device(libusb_device_handle *dev_handle)
 
 	/* Set the baudrate at the correct speed to talk to the device */
 	int baudrate = 250000;
-	libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
-			UART_ENABLE, 0, NULL, 0, 500);
-	libusb_control_transfer(dev_handle, REQTYPE, CP210X_SET_BAUDRATE, 0, 0,
+	libusb_control_transfer(dev_handle, REQTYPE,
+			CP210X_IFC_ENABLE, UART_ENABLE, 0, NULL, 0, 500);
+	libusb_control_transfer(dev_handle, REQTYPE,
+			CP210X_SET_BAUDRATE, 0, 0,
 			(void *)&baudrate, sizeof(baudrate), 500);
-	libusb_control_transfer(dev_handle, REQTYPE, CP210X_IFC_ENABLE,
-			UART_DISABLE, 0, NULL, 0, 500);
+	libusb_control_transfer(dev_handle, REQTYPE,
+			CP210X_IFC_ENABLE, UART_DISABLE, 0, NULL, 0, 500);
 	return 0;
 }
 
@@ -303,13 +372,13 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	char dbpath[PATH_MAX] = "/var/lib/tesla.rrd";
+	char dbpath[PATH_MAX] = "/tmp/tesla.rrd";
 	libusb_context *ctx = NULL;
 	libusb_device_handle *dev_handle = NULL;
 
 	signal(SIGINT, sigint_handler);
 
-	int c, ret = 0;
+	int c = 0;
 	while ((c = getopt(argc, argv, "hd")) != -1) {
 		switch (c) {
 		case 'd':
@@ -335,36 +404,29 @@ main(int argc, char **argv)
 	DPRINTF(2, "Using DB: %s\n", dbpath);
 
 	DPRINTF(1, "Please plug your CM160 device...\n");
-	ret = scan_usb(ctx, &dev_handle);
-	if (ret) {
-		fprintf(stderr, "We found the device but could not open it.\n");
-		return -1;
-	}
+	if (scan_usb(ctx, &dev_handle))
+		return 1;
 
-	if (prepare_device(dev_handle)) {
-		fprintf(stderr, "Could not prepare the device.\n");
-		return -1;
-	}
+	if (prepare_device(dev_handle))
+		return 1;
 
 	DPRINTF(1, "Start acquiring data...\n");
 
-	while (!stop) {
-		ret = get_data(dbpath, dev_handle);
-		if (ret) {
-			fprintf(stderr, "Error getting data.\n");
-			return -1;
-		}
-	}
+	struct record_history *hist;
+	if (init_history(&hist))
+		return 1;
+
+	while (!stop)
+		if (get_data(dbpath, hist, dev_handle))
+			stop = 1;
 
 	DPRINTF(2, "\nClosing connection with the device\n");
-	ret = libusb_release_interface(dev_handle, INTERFACE);
-	if (ret) {
+	if (libusb_release_interface(dev_handle, INTERFACE))
 		fprintf(stderr, "Cannot release interface.\n");
-		return -1;
-	}
 	libusb_reset_device(dev_handle);
 	libusb_close(dev_handle);
 	libusb_exit(ctx);
 
+	free_history(hist);
 	return 0;
 }
