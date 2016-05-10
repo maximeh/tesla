@@ -48,14 +48,21 @@ set( CC_OPTIONS
 	"-Wundef"
 	"-Werror"
 	"-Wno-unused"
-	"-fsanitize=address"
-	"-fsanitize=leak"
-	"-fsanitize=undefined"
-	"-fsanitize=signed-integer-overflow"
-	"-fsanitize=shift"
-	"-fsanitize=integer-divide-by-zero"
-	"-fsanitize=null"
 )
+
+if ( CMAKE_BUILD_TYPE MATCHES DEBUG )
+	set( CC_OPTIONS
+		${CC_OPTIONS}
+		"-fsanitize=address"
+		"-fsanitize=leak"
+		"-fsanitize=undefined"
+		"-fsanitize=signed-integer-overflow"
+		"-fsanitize=shift"
+		"-fsanitize=integer-divide-by-zero"
+		"-fsanitize=null"
+	)
+endif()
+
 
 target_compile_options(
 	tesla
