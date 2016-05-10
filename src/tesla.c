@@ -133,18 +133,18 @@ init_history(struct record_history **history)
 }
 
 static void
-free_history_record(struct record_history *history)
+free_history_record(struct record_history **history)
 {
-	free(history->records);
-	history->records = NULL;
+	free((*history)->records);
+	(*history)->records = NULL;
 }
 
 static void
-free_history(struct record_history *history)
+free_history(struct record_history **history)
 {
 	free_history_record(history);
-	free(history);
-	history = NULL;
+	free(*history);
+	*history = NULL;
 }
 
 static int
@@ -167,7 +167,7 @@ write_history_rrd(const char *dbpath, struct record_history *hist)
 	ret = 0;
 
 free_error:
-	free_history_record(hist);
+	free_history_record(&hist);
 	return ret;
 }
 
@@ -427,6 +427,6 @@ main(int argc, char **argv)
 	libusb_close(dev_handle);
 	libusb_exit(ctx);
 
-	free_history(hist);
+	free_history(&hist);
 	return 0;
 }
